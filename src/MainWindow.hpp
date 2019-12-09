@@ -1,11 +1,12 @@
-#ifndef MAINWINDOW_HPP
-#define MAINWINDOW_HPP
+#pragma once
 
 #include <QMainWindow>
 
 namespace Ui {
 class MainWindow;
 }
+
+class MediaPlayer;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -16,6 +17,6 @@ public:
 
 private:
 	Ui::MainWindow *d_ui;
-};
 
-#endif // MAINWINDOW_HPP
+	MediaPlayer * d_mediaPlayer;
+};

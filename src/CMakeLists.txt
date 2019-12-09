@@ -1,8 +1,10 @@
 set(SRC_FILES main.cpp
               MainWindow.cpp
+              MediaPlayer.cpp
               )
 
 set(HDR_FILES MainWindow.hpp
+              MediaPlayer.hpp
               )
 
 set(UI_FILES MainWindow.ui)
