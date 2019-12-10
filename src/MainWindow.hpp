@@ -6,7 +6,7 @@ namespace Ui {
 class MainWindow;
 }
 
-class MediaPlayer;
+class VideoWidget;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -18,5 +18,5 @@ public:
 private:
 	Ui::MainWindow *d_ui;
 
-	MediaPlayer * d_mediaPlayer;
+	VideoWidget * d_videoWidget;
 };

@@ -6,7 +6,7 @@ project(yams VERSION 0.1.0
 cmake_minimum_required(VERSION 3.11)
 
 
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt5 COMPONENTS Widgets MultimediaWidgets REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)

@@ -1,10 +1,10 @@
 set(SRC_FILES main.cpp
               MainWindow.cpp
-              MediaPlayer.cpp
+              VideoWidget.cpp
               )
 
 set(HDR_FILES MainWindow.hpp
-              MediaPlayer.hpp
+              VideoWidget.hpp
               )
 
 set(UI_FILES MainWindow.ui)
@@ -18,4 +18,4 @@ add_executable(yams ${SRC_FILES}
                     ${QRC_FILES})
 
 
-target_link_libraries(yams Qt5::Widgets)
+target_link_libraries(yams Qt5::Widgets Qt5::MultimediaWidgets)
