@@ -15,6 +15,11 @@ public:
 	explicit MainWindow(QWidget *parent = 0);
 	~MainWindow();
 
+public slots:
+
+	void on_colorButton_clicked();
+	void onVideoWidgetBackgroundChanged(const QColor & color);
+
 private:
 	Ui::MainWindow *d_ui;
 
