@@ -12,6 +12,9 @@ VideoWidget::VideoWidget(QWidget * parent)
 	, d_background(Qt::black)
 	, d_acceptClose(false)
 	, d_videoWidget(new QGraphicsVideoItem()) {
+	setStyleSheet("border: 0px");
+
+	setBackgroundBrush(d_background);
 	scene()->addItem(d_videoWidget);
 	d_videoWidget->setOpacity(1.0);
 }
@@ -52,7 +55,7 @@ void VideoWidget::setBackground(const QColor & color) {
 	bool emitSignal = color != d_background;
 	d_background = color;
 	if ( emitSignal == true ) {
-		setPalette(d_background);
+		setBackgroundBrush(d_background);
 		emit backgroundChanged(d_background);
 	}
 }
