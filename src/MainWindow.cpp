@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
 	, d_playlistModel(new PlaylistModel(this) ){
 	d_mediaPlayer->setAudioRole(QAudio::VideoRole);
 	d_mediaPlayer->setPlaylist(d_playlist);
-	d_mediaPlayer->setVideoOutput(d_videoWidget);
+	d_mediaPlayer->setVideoOutput(d_videoWidget->QVW());
 
 	d_mediaPlayer->setObjectName(QStringLiteral("mediaPlayer"));
 	d_playlist->setObjectName(QStringLiteral("playlist"));

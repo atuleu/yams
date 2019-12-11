@@ -1,8 +1,10 @@
 #pragma once
 
-#include <QVideoWidget>
+#include <QGraphicsView>
+class QGraphicsVideoItem;
+class QGraphicsOpacityEffect;
 
-class VideoWidget : public QVideoWidget {
+class VideoWidget : public QGraphicsView {
 	Q_OBJECT
 
 	Q_PROPERTY(QColor background
@@ -27,6 +29,7 @@ public:
 
 	void setAcceptClose(bool accept);
 
+	QGraphicsVideoItem * QVW();
 public slots:
 	void setBackground(const QColor & color);
 	void setOpacity(qreal);
@@ -43,4 +46,5 @@ private:
 
 	QColor d_background;
 	bool   d_acceptClose;
+	QGraphicsVideoItem * d_videoWidget;
 };

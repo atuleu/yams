@@ -1,17 +1,19 @@
 #include "VideoWidget.hpp"
 
-
+#include <QGraphicsVideoItem>
 #include <QKeyEvent>
 #include <QDebug>
 #include <QCloseEvent>
-
+#include <QGraphicsOpacityEffect>
+#include <QVBoxLayout>
 
 VideoWidget::VideoWidget(QWidget * parent)
-	: QVideoWidget(parent)
+	: QGraphicsView(new QGraphicsScene(), parent)
 	, d_background(Qt::black)
-	, d_acceptClose(false){
-	setAutoFillBackground(true);
-	setPalette(d_background);
+	, d_acceptClose(false)
+	, d_videoWidget(new QGraphicsVideoItem()) {
+	scene()->addItem(d_videoWidget);
+	d_videoWidget->setOpacity(1.0);
 }
 
 
@@ -21,7 +23,7 @@ VideoWidget::~VideoWidget() {
 void VideoWidget::keyPressEvent(QKeyEvent *event) {
 #ifndef NDEBUG
 	if (event->key() == Qt::Key_Escape && isFullScreen()) {
-		setFullScreen(false);
+		showNormal();
 	}
 #endif
 	event->accept();
@@ -29,7 +31,11 @@ void VideoWidget::keyPressEvent(QKeyEvent *event) {
 
 void VideoWidget::mouseDoubleClickEvent(QMouseEvent *event) {
 #ifndef NDEBUG
-    setFullScreen(!isFullScreen());
+	if(isFullScreen()) {
+		showNormal();
+	} else {
+		showFullScreen();
+	}
 #endif
     event->accept();
 }
@@ -53,11 +59,11 @@ void VideoWidget::setBackground(const QColor & color) {
 
 
 qreal VideoWidget::opacity() const {
-	return 1.0;
+	return d_videoWidget->opacity();
 }
 
 void VideoWidget::setOpacity(qreal opacity) {
-	qInfo() << "Set opacity" << opacity;
+	d_videoWidget->setOpacity(opacity);
 }
 void VideoWidget::setAcceptClose(bool accept) {
 	d_acceptClose = accept;
@@ -68,4 +74,8 @@ void VideoWidget::closeEvent(QCloseEvent *event) {
 	} else {
 		event->ignore();
 	}
+}
+
+QGraphicsVideoItem * VideoWidget::QVW() {
+	return d_videoWidget;
 }
