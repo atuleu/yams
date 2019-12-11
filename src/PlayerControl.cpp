@@ -109,7 +109,7 @@ qreal PlayerControl::playbackRate() const {
 
 void PlayerControl::setPlaybackRate(qreal rate) {
 	int value = qMin(50,qMax(qRound((rate - 1.0) * 50.0),-50));
-	d_ui->speedSlider->setValue(rate);
+	d_ui->speedSlider->setValue(value);
 
 }
 

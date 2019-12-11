@@ -11,6 +11,7 @@
 #include <QFileInfo>
 #include <QFileDialog>
 #include <QStandardPaths>
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
@@ -85,15 +86,18 @@ MainWindow::MainWindow(QWidget *parent)
 
 	connect(d_videoWidget, SIGNAL(opacityChanged(qreal)),
 	        d_ui->playerControl, SLOT(setOpacity(qreal)));
-
 }
 
 MainWindow::~MainWindow() {
-	d_videoWidget->close();
 	delete d_videoWidget;
 	delete d_ui;
 }
 
+void MainWindow::closeEvent(QCloseEvent * event) {
+	d_videoWidget->setAcceptClose(true);
+	d_videoWidget->close();
+	event->accept();
+}
 
 void MainWindow::on_colorButton_clicked() {
 	d_videoWidget->setBackground(QColorDialog::getColor(d_videoWidget->background(),this));
@@ -204,5 +208,4 @@ void MainWindow::on_listView_activated(const QModelIndex & index) {
 		return;
 	}
 	d_playlist->setCurrentIndex(index.row());
-	d_mediaPlayer->play();
 }

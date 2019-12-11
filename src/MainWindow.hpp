@@ -32,7 +32,7 @@ public slots:
 	void on_removeButton_clicked();
 
 protected:
-
+	void closeEvent(QCloseEvent * event) override;
 	void setStatusInfo(const QString & info);
 	void addToPlaylist(const QList<QUrl> & urls);
 

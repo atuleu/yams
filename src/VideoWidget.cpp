@@ -3,11 +3,13 @@
 
 #include <QKeyEvent>
 #include <QDebug>
+#include <QCloseEvent>
 
 
 VideoWidget::VideoWidget(QWidget * parent)
 	: QVideoWidget(parent)
-	, d_background(Qt::black){
+	, d_background(Qt::black)
+	, d_acceptClose(false){
 	setAutoFillBackground(true);
 	setPalette(d_background);
 }
@@ -56,4 +58,14 @@ qreal VideoWidget::opacity() const {
 
 void VideoWidget::setOpacity(qreal opacity) {
 	qInfo() << "Set opacity" << opacity;
+}
+void VideoWidget::setAcceptClose(bool accept) {
+	d_acceptClose = accept;
+}
+void VideoWidget::closeEvent(QCloseEvent *event) {
+	if (d_acceptClose) {
+		event->accept();
+	} else {
+		event->ignore();
+	}
 }

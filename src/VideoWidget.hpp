@@ -25,6 +25,8 @@ public:
 
 	qreal opacity() const;
 
+	void setAcceptClose(bool accept);
+
 public slots:
 	void setBackground(const QColor & color);
 	void setOpacity(qreal);
@@ -36,7 +38,9 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void mousePressEvent(QMouseEvent *event) override;
+	void closeEvent(QCloseEvent *event) override;
 private:
 
 	QColor d_background;
+	bool   d_acceptClose;
 };
