@@ -2,6 +2,8 @@
 
 
 #include <QKeyEvent>
+#include <QDebug>
+
 
 VideoWidget::VideoWidget(QWidget * parent)
 	: QVideoWidget(parent)
@@ -45,4 +47,13 @@ void VideoWidget::setBackground(const QColor & color) {
 		setPalette(d_background);
 		emit backgroundChanged(d_background);
 	}
+}
+
+
+qreal VideoWidget::opacity() const {
+	return 1.0;
+}
+
+void VideoWidget::setOpacity(qreal opacity) {
+	qInfo() << "Set opacity" << opacity;
 }

@@ -19,7 +19,7 @@ public:
 
 	static bool isM3uPlaylist(const QUrl & url);
 public slots:
-
+	void on_listView_activated(const QModelIndex &);
 	void on_colorButton_clicked();
 	void onVideoWidgetBackgroundChanged(const QColor & color);
 	void on_mediaPlayer_metaDataChanged();

@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent)
 	, d_ui(new Ui::MainWindow)
 	, d_videoWidget(new VideoWidget())
 	, d_mediaPlayer(new QMediaPlayer(this))
-	, d_playlist(new QMediaPlaylist(this))
+	, d_playlist(new QMediaPlaylist())
 	, d_playlistModel(new PlaylistModel(this) ){
 	d_mediaPlayer->setAudioRole(QAudio::VideoRole);
 	d_mediaPlayer->setPlaylist(d_playlist);
@@ -52,12 +52,12 @@ MainWindow::MainWindow(QWidget *parent)
 	        d_ui->playerControl,SLOT(positionChanged(qint64)));
 
 	connect(d_ui->playerControl, SIGNAL(play()),
-	        d_mediaPlayer, SLOT(play));
+	        d_mediaPlayer, SLOT(play()));
 	connect(d_ui->playerControl, SIGNAL(pause()),
 	        d_mediaPlayer, SLOT(pause()));
 	connect(d_ui->playerControl, SIGNAL(stop()),
 	        d_mediaPlayer, SLOT(stop()));
-	connect(d_ui->playerControl, SIGNAL(next),
+	connect(d_ui->playerControl, SIGNAL(next()),
 	        d_playlist, SLOT(next()));
 	//	connect(d_ui->playerControl, SIGNAL(previous),
 	//        this, &Player::previousClicked);
@@ -67,16 +67,18 @@ MainWindow::MainWindow(QWidget *parent)
 	        d_mediaPlayer, SLOT(setPlaybackRate(qreal)));
 	connect(d_ui->playerControl, SIGNAL(stop()),
 	        d_videoWidget, SLOT(update()));
+	connect(d_ui->playerControl, SIGNAL(changeOpacity(qreal)),
+	        d_videoWidget, SLOT(setOpacity(qreal)));
 
 	d_ui->playerControl->setState(d_mediaPlayer->state());
 	d_ui->playerControl->setVolume(d_mediaPlayer->volume());
 	d_ui->playerControl->setPlaybackRate(d_mediaPlayer->playbackRate());
 	d_ui->playerControl->setOpacity(d_videoWidget->opacity());
 	connect(d_mediaPlayer, SIGNAL(stateChanged(QMediaPlayer::State)),
-	        d_ui->playerControl, SLOT(setState(QMediaPLayer::State)));
+	        d_ui->playerControl, SLOT(setState(QMediaPlayer::State)));
 
 	connect(d_mediaPlayer, SIGNAL(volumeChanged(int)),
-	        d_ui->playerControl, SLOT(setColume(int)));
+	        d_ui->playerControl, SLOT(setVolume(int)));
 
 	connect(d_mediaPlayer, SIGNAL(playbackRateChanged(qreal)),
 	        d_ui->playerControl, SLOT(setPlaybackRate(qreal)));
@@ -87,6 +89,7 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() {
+	d_videoWidget->close();
 	delete d_videoWidget;
 	delete d_ui;
 }
@@ -194,4 +197,12 @@ void MainWindow::addToPlaylist(const QList<QUrl> &urls) {
 			d_playlist->addMedia(url);
 		}
 	}
+}
+
+void MainWindow::on_listView_activated(const QModelIndex & index) {
+	if (!index.isValid()) {
+		return;
+	}
+	d_playlist->setCurrentIndex(index.row());
+	d_mediaPlayer->play();
 }
