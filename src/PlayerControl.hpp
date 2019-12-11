@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QMediaPlayer>
 
 namespace Ui {
 class PlayerControl;
@@ -17,12 +18,26 @@ public:
 public slots:
 	void durationChanged(qint64 durationMS);
 	void positionChanged(qint64 durationMS);
+	void setState(QMediaPlayer::State state);
+	void setVolume(int);
+	void setPlaybackRate(qreal);
+	void setOpacity(qreal);
+
+
 
 protected slots:
 	void on_positionSlider_sliderMoved(int value);
 
+
 signals:
 	void seek(qint64 durationMS);
+	void play();
+	void pause();
+	void stop();
+	void next();
+	void prev();
+	void changeVolume(int);
+	void changeRate(qreal);
 
 protected:
 	void updatePositionInfo(qint64 durationMS);

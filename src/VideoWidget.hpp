@@ -10,6 +10,11 @@ class VideoWidget : public QVideoWidget {
 	           WRITE setBackground
 	           NOTIFY backgroundChanged);
 
+	Q_PROPERTY(qreal opacity
+	           READ opacity
+	           WRITE setOpacity
+	           NOTIFY opacityChanged);
+
 
 
 public:
@@ -18,12 +23,15 @@ public:
 
 	QColor background() const;
 
+	qreal opacity() const;
+
 public slots:
 	void setBackground(const QColor & color);
+	void setOpacity(qreal);
 
 signals:
 	void backgroundChanged(const QColor & color);
-
+	void opacityChanged(qreal);
 protected:
     void keyPressEvent(QKeyEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;

@@ -51,6 +51,39 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(d_mediaPlayer,SIGNAL(positionChanged(qint64)),
 	        d_ui->playerControl,SLOT(positionChanged(qint64)));
 
+	connect(d_ui->playerControl, SIGNAL(play()),
+	        d_mediaPlayer, SLOT(play));
+	connect(d_ui->playerControl, SIGNAL(pause()),
+	        d_mediaPlayer, SLOT(pause()));
+	connect(d_ui->playerControl, SIGNAL(stop()),
+	        d_mediaPlayer, SLOT(stop()));
+	connect(d_ui->playerControl, SIGNAL(next),
+	        d_playlist, SLOT(next()));
+	//	connect(d_ui->playerControl, SIGNAL(previous),
+	//        this, &Player::previousClicked);
+	connect(d_ui->playerControl, SIGNAL(changeVolume(int)),
+	        d_mediaPlayer, SLOT(setVolume(int)));
+	connect(d_ui->playerControl, SIGNAL(changeRate(qreal)),
+	        d_mediaPlayer, SLOT(setPlaybackRate(qreal)));
+	connect(d_ui->playerControl, SIGNAL(stop()),
+	        d_videoWidget, SLOT(update()));
+
+	d_ui->playerControl->setState(d_mediaPlayer->state());
+	d_ui->playerControl->setVolume(d_mediaPlayer->volume());
+	d_ui->playerControl->setPlaybackRate(d_mediaPlayer->playbackRate());
+	d_ui->playerControl->setOpacity(d_videoWidget->opacity());
+	connect(d_mediaPlayer, SIGNAL(stateChanged(QMediaPlayer::State)),
+	        d_ui->playerControl, SLOT(setState(QMediaPLayer::State)));
+
+	connect(d_mediaPlayer, SIGNAL(volumeChanged(int)),
+	        d_ui->playerControl, SLOT(setColume(int)));
+
+	connect(d_mediaPlayer, SIGNAL(playbackRateChanged(qreal)),
+	        d_ui->playerControl, SLOT(setPlaybackRate(qreal)));
+
+	connect(d_videoWidget, SIGNAL(opacityChanged(qreal)),
+	        d_ui->playerControl, SLOT(setOpacity(qreal)));
+
 }
 
 MainWindow::~MainWindow() {
