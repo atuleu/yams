@@ -17,6 +17,12 @@ VideoWidget::VideoWidget(QWidget * parent)
 	setBackgroundBrush(d_background);
 	scene()->addItem(d_videoWidget);
 	d_videoWidget->setOpacity(1.0);
+
+	// connect(d_videoWidget,SIGNAL(nativeSizeChanged(const QSizeF &)),
+	//         this,SLOT(updateSize()));
+	d_videoWidget->setSize(size());
+	setSceneRect(QRectF(QPointF(0,0),size()));
+
 }
 
 
@@ -81,4 +87,11 @@ void VideoWidget::closeEvent(QCloseEvent *event) {
 
 QGraphicsVideoItem * VideoWidget::QVW() {
 	return d_videoWidget;
+}
+
+
+void VideoWidget::resizeEvent(QResizeEvent * event) {
+	d_videoWidget->setSize(size());
+	setSceneRect(QRectF(QPointF(0,0),size()));
+	QGraphicsView::resizeEvent(event);
 }

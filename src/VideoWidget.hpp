@@ -33,7 +33,6 @@ public:
 public slots:
 	void setBackground(const QColor & color);
 	void setOpacity(qreal);
-
 signals:
 	void backgroundChanged(const QColor & color);
 	void opacityChanged(qreal);
@@ -42,6 +41,7 @@ protected:
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void mousePressEvent(QMouseEvent *event) override;
 	void closeEvent(QCloseEvent *event) override;
+	void resizeEvent(QResizeEvent *event) override;
 private:
 
 	QColor d_background;
