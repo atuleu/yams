@@ -43,6 +43,8 @@ public slots:
 
 	void on_liveButton_toggled(bool);
 
+	void on_playbackBox_currentIndexChanged(int);
+
 protected:
 	void closeEvent(QCloseEvent * event) override;
 	void setStatusInfo(const QString & info);

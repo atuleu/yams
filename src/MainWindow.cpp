@@ -37,7 +37,14 @@ MainWindow::MainWindow(QWidget *parent)
 	        this,SLOT(onPlaylistMediaRemoved(int,int)));
 
 
+
 	d_ui->setupUi(this);
+	d_ui->playbackBox->insertItem(0,tr("Current item once"),QMediaPlaylist::CurrentItemOnce);
+	d_ui->playbackBox->insertItem(1,tr("Current item in loop"),QMediaPlaylist::CurrentItemInLoop);
+	d_ui->playbackBox->insertItem(2,tr("Sequence"),QMediaPlaylist::Sequential);
+	d_ui->playbackBox->insertItem(3,tr("Loop"),QMediaPlaylist::Loop);
+	d_ui->playbackBox->insertItem(4,tr("Random"),QMediaPlaylist::Random);
+
 	d_videoWidget->show();
 
 	d_playlistModel->setPlaylist(d_playlist);
@@ -326,6 +333,7 @@ void MainWindow::saveCompositionState() {
 		urls.push_back(d_playlist->media(i).canonicalUrl().toString());
 	}
 	settings.setValue("composition/playlist",urls);
+	settings.setValue("composition/playbackMode",d_ui->playbackBox->currentData().toInt());
 }
 
 
@@ -347,11 +355,27 @@ void MainWindow::restoreCompositionState() {
 		d_ui->liveButton->setChecked(settings.value("composition/isLive",false).toBool());
 	}
 	d_ui->playerControl->setOpacity(settings.value("composition/opacity",1.0).toDouble());
-	d_ui->playerControl->setPlaybackRate(settings.value("composition/rate",1.0).toDouble());
+	//d_ui->playerControl->setPlaybackRate(settings.value("composition/rate",1.0).toDouble());
+	d_ui->playerControl->setPlaybackRate(1.0);
 	d_ui->playerControl->setVolume(settings.value("composition/volume",100).toInt());
 
 	for(const auto & url: settings.value("composition/playlist").toStringList() ) {
 		addToPlaylist({url});
 	}
+	auto mode = (QMediaPlaylist::PlaybackMode)settings.value("composition/playbackMode",QMediaPlaylist::Sequential).toInt();
+	for(int i = 0; i < d_ui->playbackBox->count(); ++i) {
+		auto bmode = (QMediaPlaylist::PlaybackMode)d_ui->playbackBox->itemData(i).toInt();
+		if ( mode == bmode ) {
+			d_ui->playbackBox->setCurrentIndex(i);
+			break;
+		}
+	}
+}
 
+void MainWindow::on_playbackBox_currentIndexChanged(int index) {
+	if ( index < 0 ){
+		return;
+	}
+
+	d_playlist->setPlaybackMode((QMediaPlaylist::PlaybackMode)d_ui->playbackBox->currentData().toInt());
 }
