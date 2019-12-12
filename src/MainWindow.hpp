@@ -9,7 +9,7 @@ class MainWindow;
 class VideoWidget;
 class PlaylistModel;
 class QMediaPlayer;
-
+class QItemSelection;
 class MainWindow : public QMainWindow {
 	Q_OBJECT
 
@@ -30,6 +30,12 @@ public slots:
 
 	void on_addButton_clicked();
 	void on_removeButton_clicked();
+	void on_clearButton_clicked();
+
+	void selectionChanged(const QItemSelection & selected,const QItemSelection & deselected);
+
+	void onPlaylistMediaInserted(int,int);
+	void onPlaylistMediaRemoved(int,int);
 
 protected:
 	void closeEvent(QCloseEvent * event) override;

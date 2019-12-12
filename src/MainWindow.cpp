@@ -30,7 +30,10 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(d_videoWidget,SIGNAL(backgroundChanged(const QColor &)),
 	        this,SLOT(onVideoWidgetBackgroundChanged(const QColor &)));
 
-
+	connect(d_playlist,SIGNAL(mediaInserted(int,int)),
+	        this,SLOT(onPlaylistMediaInserted(int,int)));
+	connect(d_playlist,SIGNAL(mediaRemoved(int,int)),
+	        this,SLOT(onPlaylistMediaRemoved(int,int)));
 
 
 	d_ui->setupUi(this);
@@ -87,6 +90,12 @@ MainWindow::MainWindow(QWidget *parent)
 
 	connect(d_videoWidget, SIGNAL(opacityChanged(qreal)),
 	        d_ui->playerControl, SLOT(setOpacity(qreal)));
+
+
+	connect(d_ui->listView->selectionModel(),
+	        SIGNAL(selectionChanged(const QItemSelection &,const QItemSelection &)),
+	        this,
+	        SLOT(selectionChanged(const QItemSelection &,const QItemSelection &)));
 
 
 	QSettings settings;
@@ -202,7 +211,10 @@ void MainWindow::on_addButton_clicked() {
 }
 
 void MainWindow::on_removeButton_clicked() {
-
+	auto selected = d_ui->listView->selectionModel()->selectedRows();
+	for(const auto & r : selected) {
+		d_playlist->removeMedia(r.row());
+	}
 }
 
 void MainWindow::addToPlaylist(const QList<QUrl> &urls) {
@@ -220,4 +232,27 @@ void MainWindow::on_listView_activated(const QModelIndex & index) {
 		return;
 	}
 	d_playlist->setCurrentIndex(index.row());
+}
+
+
+void MainWindow::selectionChanged(const QItemSelection & selected,
+                                  const QItemSelection & deselected) {
+	if (selected.isEmpty()) {
+		d_ui->removeButton->setEnabled(false);
+	} else {
+		d_ui->removeButton->setEnabled(true);
+	}
+
+}
+
+void MainWindow::onPlaylistMediaInserted(int,int) {
+	d_ui->clearButton->setEnabled(!d_playlist->isEmpty());
+}
+
+void MainWindow::onPlaylistMediaRemoved(int,int) {
+	d_ui->clearButton->setEnabled(!d_playlist->isEmpty());
+}
+
+void MainWindow::on_clearButton_clicked() {
+	d_playlist->clear();
 }
