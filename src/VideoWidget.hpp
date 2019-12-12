@@ -3,7 +3,7 @@
 #include <QGraphicsView>
 class QGraphicsVideoItem;
 class QGraphicsOpacityEffect;
-
+class QScreen;
 class VideoWidget : public QGraphicsView {
 	Q_OBJECT
 
@@ -33,7 +33,7 @@ public:
 public slots:
 	void setBackground(const QColor & color);
 	void setOpacity(qreal);
-	void setFullScreen(bool fullscreen);
+	void setFullScreen(bool fullscreen,QScreen *screen);
 signals:
 	void backgroundChanged(const QColor & color);
 	void opacityChanged(qreal);

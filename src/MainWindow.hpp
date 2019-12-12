@@ -37,6 +37,12 @@ public slots:
 	void onPlaylistMediaInserted(int,int);
 	void onPlaylistMediaRemoved(int,int);
 
+	void onScreenChange(QScreen *);
+
+	void on_screenBox_currentIndexChanged(int);
+
+	void on_liveButton_toggled(bool);
+
 protected:
 	void closeEvent(QCloseEvent * event) override;
 	void setStatusInfo(const QString & info);

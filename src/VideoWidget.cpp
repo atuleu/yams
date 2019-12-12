@@ -7,6 +7,7 @@
 #include <QGraphicsOpacityEffect>
 #include <QVBoxLayout>
 #include <QSettings>
+#include <QScreen>
 
 VideoWidget::VideoWidget(QWidget * parent)
 	: QGraphicsView(new QGraphicsScene(), parent)
@@ -34,7 +35,7 @@ VideoWidget::~VideoWidget() {
 void VideoWidget::keyPressEvent(QKeyEvent *event) {
 #ifndef NDEBUG
 	if (event->key() == Qt::Key_Escape && isFullScreen()) {
-		setFullScreen(false);
+		setFullScreen(false,NULL);
 	}
 #endif
 	event->accept();
@@ -42,7 +43,7 @@ void VideoWidget::keyPressEvent(QKeyEvent *event) {
 
 void VideoWidget::mouseDoubleClickEvent(QMouseEvent *event) {
 #ifndef NDEBUG
-	setFullScreen(!isFullScreen());
+	setFullScreen(!isFullScreen(),NULL);
 #endif
     event->accept();
 }
@@ -96,7 +97,7 @@ void VideoWidget::resizeEvent(QResizeEvent * event) {
 }
 
 
-void VideoWidget::setFullScreen(bool fullscreen) {
+void VideoWidget::setFullScreen(bool fullscreen,QScreen * screen) {
 	if ( isFullScreen() == fullscreen ) {
 		//nothing to do
 		return;
@@ -104,6 +105,10 @@ void VideoWidget::setFullScreen(bool fullscreen) {
 
 	if ( fullscreen == true ) {
 		saveWindowGeometry();
+		if ( screen != NULL ) {
+			auto geom = screen->geometry();
+			move(QPoint(geom.x(),geom.y()));
+		}
 		showFullScreen();
 	} else {
 		showNormal();

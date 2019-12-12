@@ -13,6 +13,7 @@
 #include <QStandardPaths>
 #include <QCloseEvent>
 #include <QSettings>
+#include <QScreen>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
@@ -97,6 +98,13 @@ MainWindow::MainWindow(QWidget *parent)
 	        this,
 	        SLOT(selectionChanged(const QItemSelection &,const QItemSelection &)));
 
+
+	onScreenChange(NULL);
+	connect(QGuiApplication::instance(),SIGNAL(screenAdded(QScreen*)),
+	        this,SLOT(onScreenChange(QScreen*)));
+
+	connect(QGuiApplication::instance(),SIGNAL(screenRemoved(QScreen*)),
+	        this,SLOT(onScreenChange(QScreen*)));
 
 	QSettings settings;
 
@@ -255,4 +263,40 @@ void MainWindow::onPlaylistMediaRemoved(int,int) {
 
 void MainWindow::on_clearButton_clicked() {
 	d_playlist->clear();
+}
+
+
+void MainWindow::onScreenChange(QScreen *) {
+	auto selected = d_ui->screenBox->currentData().toString();
+	qInfo() << selected;
+	d_ui->screenBox->clear();
+	bool noSelection = true;
+	int index = 0;
+	for(const auto & s : QGuiApplication::screens()) {
+		QString name = s->name() + "-" + s->manufacturer() + "-" + s->model();
+		d_ui->screenBox->insertItem(index,name,name);
+		if ( name == selected) {
+			noSelection = false;
+			d_ui->screenBox->setCurrentIndex(index);
+		}
+		++index;
+	}
+	if ( noSelection == true ) {
+		d_ui->screenBox->setCurrentIndex(-1);
+	}
+}
+
+void MainWindow::on_screenBox_currentIndexChanged(int index) {
+	if (index < 0 ) {
+		d_ui->liveButton->setChecked(false);
+		d_ui->liveButton->setEnabled(false);
+		return;
+	}
+	d_ui->liveButton->setEnabled(true);
+}
+
+
+void MainWindow::on_liveButton_toggled(bool value)  {
+	auto screen = QGuiApplication::screens()[d_ui->screenBox->currentIndex()];
+	d_videoWidget->setFullScreen(value,screen);
 }
