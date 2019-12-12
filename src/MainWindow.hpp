@@ -49,6 +49,9 @@ protected:
 	void addToPlaylist(const QList<QUrl> & urls);
 
 private:
+	void saveCompositionState();
+	void restoreCompositionState();
+
 	Ui::MainWindow *d_ui;
 
 	VideoWidget * d_videoWidget;

@@ -110,6 +110,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	restoreGeometry(settings.value("mainWindow/geometry").toByteArray());
 	restoreState(settings.value("mainWindow/state").toByteArray());
+	restoreCompositionState();
 }
 
 MainWindow::~MainWindow() {
@@ -118,6 +119,11 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::closeEvent(QCloseEvent * event) {
+	if ( d_ui->liveButton->isChecked() ) {
+		event->ignore();
+		return;
+	}
+	saveCompositionState();
 	QSettings settings;
 	settings.setValue("mainWindow/geometry",saveGeometry());
 	settings.setValue("mainWindow/state",saveState());
@@ -299,4 +305,53 @@ void MainWindow::on_screenBox_currentIndexChanged(int index) {
 void MainWindow::on_liveButton_toggled(bool value)  {
 	auto screen = QGuiApplication::screens()[d_ui->screenBox->currentIndex()];
 	d_videoWidget->setFullScreen(value,screen);
+}
+
+
+void MainWindow::saveCompositionState() {
+	QSettings settings;
+
+	settings.setValue("composition/backgroundColor",d_videoWidget->background().name());
+	settings.setValue("composition/screenName",d_ui->screenBox->currentData().toString());
+	if(d_ui->screenBox->currentIndex() < 0 ) {
+		settings.setValue("composition/isLive",false);
+	} else {
+		settings.setValue("composition/isLive",d_ui->liveButton->isChecked());
+	}
+	settings.setValue("composition/opacity",d_ui->playerControl->opacity());
+	settings.setValue("composition/rate",d_ui->playerControl->playbackRate());
+	settings.setValue("composition/volume",d_ui->playerControl->volume());
+	QStringList urls;
+	for(int i = 0; i < d_playlist->mediaCount(); ++i){
+		urls.push_back(d_playlist->media(i).canonicalUrl().toString());
+	}
+	settings.setValue("composition/playlist",urls);
+}
+
+
+void MainWindow::restoreCompositionState() {
+	QSettings settings;
+
+	QColor background(settings.value("composition/backgroundColor","#000000").toString());
+	d_videoWidget->setBackground(background);
+	auto screen =  settings.value("composition/screenName").toString();
+	for ( int i = 0; i < d_ui->screenBox->count(); ++i) {
+		if ( d_ui->screenBox->itemData(i).toString() == screen ) {
+			d_ui->screenBox->setCurrentIndex(i);
+			break;
+		}
+	}
+	if ( d_ui->screenBox->currentIndex() < 0 ) {
+		d_ui->liveButton->setChecked(false);
+	} else {
+		d_ui->liveButton->setChecked(settings.value("composition/isLive",false).toBool());
+	}
+	d_ui->playerControl->setOpacity(settings.value("composition/opacity",1.0).toDouble());
+	d_ui->playerControl->setPlaybackRate(settings.value("composition/rate",1.0).toDouble());
+	d_ui->playerControl->setVolume(settings.value("composition/volume",100).toInt());
+
+	for(const auto & url: settings.value("composition/playlist").toStringList() ) {
+		addToPlaylist({url});
+	}
+
 }
