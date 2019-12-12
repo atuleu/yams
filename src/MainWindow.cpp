@@ -12,6 +12,7 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QSettings>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
@@ -86,6 +87,12 @@ MainWindow::MainWindow(QWidget *parent)
 
 	connect(d_videoWidget, SIGNAL(opacityChanged(qreal)),
 	        d_ui->playerControl, SLOT(setOpacity(qreal)));
+
+
+	QSettings settings;
+
+	restoreGeometry(settings.value("mainWindow/geometry").toByteArray());
+	restoreState(settings.value("mainWindow/state").toByteArray());
 }
 
 MainWindow::~MainWindow() {
@@ -94,9 +101,14 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::closeEvent(QCloseEvent * event) {
+	QSettings settings;
+	settings.setValue("mainWindow/geometry",saveGeometry());
+	settings.setValue("mainWindow/state",saveState());
+
 	d_videoWidget->setAcceptClose(true);
 	d_videoWidget->close();
-	event->accept();
+
+	QMainWindow::closeEvent(event);
 }
 
 void MainWindow::on_colorButton_clicked() {

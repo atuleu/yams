@@ -33,6 +33,7 @@ public:
 public slots:
 	void setBackground(const QColor & color);
 	void setOpacity(qreal);
+	void setFullScreen(bool fullscreen);
 signals:
 	void backgroundChanged(const QColor & color);
 	void opacityChanged(qreal);
@@ -43,7 +44,8 @@ protected:
 	void closeEvent(QCloseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
 private:
-
+	void saveWindowGeometry();
+	void restoreWindowGeometry();
 	QColor d_background;
 	bool   d_acceptClose;
 	QGraphicsVideoItem * d_videoWidget;

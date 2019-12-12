@@ -6,6 +6,7 @@
 #include <QCloseEvent>
 #include <QGraphicsOpacityEffect>
 #include <QVBoxLayout>
+#include <QSettings>
 
 VideoWidget::VideoWidget(QWidget * parent)
 	: QGraphicsView(new QGraphicsScene(), parent)
@@ -23,6 +24,7 @@ VideoWidget::VideoWidget(QWidget * parent)
 	d_videoWidget->setSize(size());
 	setSceneRect(QRectF(QPointF(0,0),size()));
 
+	restoreWindowGeometry();
 }
 
 
@@ -32,7 +34,7 @@ VideoWidget::~VideoWidget() {
 void VideoWidget::keyPressEvent(QKeyEvent *event) {
 #ifndef NDEBUG
 	if (event->key() == Qt::Key_Escape && isFullScreen()) {
-		showNormal();
+		setFullScreen(false);
 	}
 #endif
 	event->accept();
@@ -40,11 +42,7 @@ void VideoWidget::keyPressEvent(QKeyEvent *event) {
 
 void VideoWidget::mouseDoubleClickEvent(QMouseEvent *event) {
 #ifndef NDEBUG
-	if(isFullScreen()) {
-		showNormal();
-	} else {
-		showFullScreen();
-	}
+	setFullScreen(!isFullScreen());
 #endif
     event->accept();
 }
@@ -79,6 +77,7 @@ void VideoWidget::setAcceptClose(bool accept) {
 }
 void VideoWidget::closeEvent(QCloseEvent *event) {
 	if (d_acceptClose) {
+		saveWindowGeometry();
 		event->accept();
 	} else {
 		event->ignore();
@@ -94,4 +93,31 @@ void VideoWidget::resizeEvent(QResizeEvent * event) {
 	d_videoWidget->setSize(size());
 	setSceneRect(QRectF(QPointF(0,0),size()));
 	QGraphicsView::resizeEvent(event);
+}
+
+
+void VideoWidget::setFullScreen(bool fullscreen) {
+	if ( isFullScreen() == fullscreen ) {
+		//nothing to do
+		return;
+	}
+
+	if ( fullscreen == true ) {
+		saveWindowGeometry();
+		showFullScreen();
+	} else {
+		showNormal();
+		restoreWindowGeometry();
+	}
+
+}
+
+void VideoWidget::saveWindowGeometry() {
+	QSettings settings;
+	settings.setValue("videoOutput/geometry", saveGeometry());
+}
+
+void VideoWidget::restoreWindowGeometry() {
+	QSettings settings;
+	restoreGeometry(settings.value("videoOutput/geometry").toByteArray());
 }
