@@ -28,7 +28,7 @@ This document outlines the development phases for YAMS, with detailed task break
 - [x] Create CMakeLists.txt root project
 - [x] Add Qt6 dependency detection (find_package)
 - [x] Create minimal Qt application displaying "Hello YAMS" window
-- [ ] Add basic logging output
+- [x] Add basic logging output (using slog++)
 - [ ] Add GoogleTest dependency and create sample test (tests build system)
 - [ ] **Linux CI**: Setup GitHub Actions workflow
   - [ ] Install Qt6 and build dependencies

@@ -2,12 +2,12 @@
 #include <QLabel>
 #include <QMainWindow>
 
-#include <QDebug>
+#include <slog++/slog++.hpp>
 
 int main(int argc, char *argv[]) {
 	QApplication app(argc, argv);
 
-	qInfo() << "Starting YAMS v0.1.0";
+	slog::Info("Starting YAMS", slog::String("version", "v0.1.0"));
 
 	QMainWindow window;
 	window.setWindowTitle("Hello YAMS");
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 	window.resize(640, 480);
 	window.show();
 
-	qInfo() << "Main window displayed";
+	slog::Info("Main window displayed");
 
 	return app.exec();
 }
