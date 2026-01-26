@@ -52,10 +52,8 @@ void qtMessageHandler(
 		break;
 
 	case QtFatalMsg:
-		// Fatal messages should terminate the application
+		// slog will terminate.
 		slog::Fatal(message, fileAttr, lineAttr, category);
-		// slog::Fatal may or may not terminate, ensure we abort
-		std::abort();
 		break;
 	}
 }
