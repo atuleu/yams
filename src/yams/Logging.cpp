@@ -5,6 +5,7 @@
 #include <QtCore/QMessageLogContext>
 #include <QtCore/QString>
 
+#include <qglobal.h>
 #include <slog++/slog++.hpp>
 
 namespace yams {
@@ -61,10 +62,11 @@ void qtMessageHandler(
 
 } // namespace
 
-void initLogging() {
-	// Install our custom Qt message handler
-	// This must be called before QApplication is created
-	qInstallMessageHandler(qtMessageHandler);
+QtMessageHandler initLogging() {
+	// Install our custom Qt message handler and return the previous one
+	// This must be called before QApplication is created to capture all
+	// messages
+	return qInstallMessageHandler(qtMessageHandler);
 }
 
 } // namespace yams
