@@ -105,27 +105,68 @@ ctest
 # Generate coverage report (requires lcov/gcovr)
 ```
 
-## Linting and Formatting
+## Code Formatting (Mandatory)
 
-### ClangFormat
+**All code must be formatted before committing.** The project uses `.clang-format` for C++ code and `.cmake-format.yaml` for CMake files.
+
+### CMake Formatting (cmake-format)
+
+Install cmake-format:
 ```bash
-# Format single file
-clang-format -i src/media_layer.cpp
-
-# Format all source files
-find src include -name "*.cpp" -o -name "*.hpp" | xargs clang-format -i
-
-# Check formatting without modifying
-clang-format --dry-run --Werror src/media_layer.cpp
+pip install cmake-format
 ```
 
-### Clang-Tidy
+Format commands:
+```bash
+# Format single CMakeLists.txt file
+cmake-format -i CMakeLists.txt
+
+# Format all CMakeLists.txt files in project
+find . -name "CMakeLists.txt" -exec cmake-format -i {} \;
+
+# Check formatting without modifying
+cmake-format --check CMakeLists.txt
+```
+
+Configuration file: `.cmake-format.yaml` (tab-based indentation, 80-char lines)
+
+### C++ Formatting (clang-format)
+
+Format commands:
+```bash
+# Format single file
+clang-format -i src/yams/main.cpp
+
+# Format all C++ source files
+find src tests -name "*.cpp" -o -name "*.hpp" | xargs clang-format -i
+
+# Check formatting without modifying
+clang-format --dry-run --Werror src/yams/main.cpp
+```
+
+Configuration file: `.clang-format` (LLVM-based, tab indentation, 4-width)
+
+### Linting (clang-tidy)
+
 ```bash
 # Lint single file
-clang-tidy src/media_layer.cpp -- -Iinclude
+clang-tidy src/yams/main.cpp -- -Iinclude
 
 # Lint all files
 find src -name "*.cpp" | xargs clang-tidy -p build
+```
+
+**Pre-commit workflow**: Always format before committing:
+```bash
+# Format all CMake files
+find . -name "CMakeLists.txt" -exec cmake-format -i {} \;
+
+# Format all C++ files
+find src tests -name "*.cpp" -o -name "*.hpp" | xargs clang-format -i
+
+# Then commit
+git add .
+git commit -m "Your commit message"
 ```
 
 ## Code Style Guidelines
