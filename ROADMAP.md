@@ -2,7 +2,7 @@
 
 This document outlines the development phases for YAMS, with detailed task breakdown for each phase. Each phase includes Linux and Windows testing/deployment to ensure cross-platform compatibility throughout development.
 
-**Current Phase**: Phase 0 (Foundation)  
+**Current Phase**: Phase 0 (Foundation)
 **Last Updated**: 2026-01-26
 
 ---
@@ -25,9 +25,9 @@ This document outlines the development phases for YAMS, with detailed task break
 **Goal**: Get minimal Qt app building in CI with Windows installer and Flatpak from day one.
 
 **Tasks**:
-- [ ] Create CMakeLists.txt root project
-- [ ] Add Qt6 dependency detection (find_package)
-- [ ] Create minimal Qt application displaying "Hello YAMS" window
+- [x] Create CMakeLists.txt root project
+- [x] Add Qt6 dependency detection (find_package)
+- [x] Create minimal Qt application displaying "Hello YAMS" window
 - [ ] Add basic logging output
 - [ ] Add GoogleTest dependency and create sample test (tests build system)
 - [ ] **Linux CI**: Setup GitHub Actions workflow
