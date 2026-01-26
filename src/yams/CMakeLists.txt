@@ -19,6 +19,8 @@ target_link_libraries(yams PRIVATE yams-common)
 
 add_executable(yams-tests ${SRC_TESTS_FILES})
 
-target_link_libraries(yams-tests yams-common GTest::gtest)
+target_link_libraries(yams-tests yams-common GTest::gtest GTest::gmock)
 
 gtest_discover_tests(yams-tests)
+
+add_dependencies(check yams-tests)
