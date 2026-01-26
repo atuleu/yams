@@ -1,0 +1,110 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and Test (MSVC 2022, RelWithDebInfo)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/Qt
+          key: qt-6.9.3-windows-msvc2022-${{ runner.os }}
+
+      - name: Install Qt via aqt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        run: |
+          pip install aqtinstall
+          aqt install-qt windows desktop 6.9.3 win64_msvc2022_64 -O ${{ github.workspace }}/Qt
+
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake
+        shell: cmd
+        run: |
+          set Qt6_DIR=${{ github.workspace }}\Qt\6.9.3\msvc2022_64
+          cmake -S . -B build ^
+            -G "Ninja" ^
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}\Qt\6.9.3\msvc2022_64 ^
+            -DCMAKE_CXX_COMPILER=cl
+
+      - name: Build and run tests
+        shell: cmd
+        run: |
+          cmake --build build --parallel
+
+      - name: Create deployment directory
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path deploy
+          Copy-Item build\src\yams\yams.exe deploy\
+
+      - name: Bundle Qt DLLs with windeployqt
+        shell: cmd
+        run: |
+          set PATH=${{ github.workspace }}\Qt\6.9.3\msvc2022_64\bin;%PATH%
+          windeployqt --release --no-translations deploy\yams.exe
+
+      - name: Create ZIP artifact
+        shell: powershell
+        run: |
+          Compress-Archive -Path deploy\* -DestinationPath yams-windows-x64.zip
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-failure-windows
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/*.log
+          retention-days: 30
+
+      - name: Upload Windows ZIP artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yams-windows-x64
+          path: yams-windows-x64.zip
+          retention-days: 7
+
+      - name: Display build summary
+        if: always()
+        shell: powershell
+        run: |
+          echo "## Build Summary" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **OS**: Windows 10/11 (MSVC 2022)" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **Build Type**: RelWithDebInfo" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **Qt Version**: 6.9.3" >> $env:GITHUB_STEP_SUMMARY
+          if (Test-Path deploy\yams.exe) {
+            $size = (Get-Item deploy\yams.exe).Length / 1MB
+            echo "- **Binary Size**: $([math]::Round($size, 2)) MB" >> $env:GITHUB_STEP_SUMMARY
+          }
+          if (Test-Path yams-windows-x64.zip) {
+            $zipSize = (Get-Item yams-windows-x64.zip).Length / 1MB
+            echo "- **ZIP Size**: $([math]::Round($zipSize, 2)) MB" >> $env:GITHUB_STEP_SUMMARY
+          }
