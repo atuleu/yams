@@ -41,5 +41,7 @@ FetchContent_MakeAvailable(slogpp googletest)
 # Enable testing
 enable_testing()
 
+include(GoogleTest)
+
 # Add source subdirectory
 add_subdirectory(src/yams)
