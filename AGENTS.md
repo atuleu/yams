@@ -6,11 +6,11 @@ YAMS (Yet Another Media Server) is a minimalistic media server for small venues 
 
 **Core Technologies:**
 - C++ (C++17 or later)
-- Qt for GUI components
-- FFmpeg/GStreamer for media handling
-- OpenGL for compositing and rendering
+- Qt 6.x for GUI components and event loop
+- **GStreamer 1.22+** for media handling (hardware-accelerated decoding)
+- OpenGL 3.3+ for compositing and rendering
 - CMake for build system
-- GoogleTest/Catch2 for testing
+- GoogleTest for unit and integration testing
 
 **Key Features:**
 - Support for 1-3 layers
@@ -19,6 +19,31 @@ YAMS (Yet Another Media Server) is a minimalistic media server for small venues 
 - OSC, sACN, and ArtNet control protocols
 
 ## Build Commands
+
+### Dependency Installation
+
+**Windows (CI or local development):**
+```bash
+# Install Qt using aqt (Another Qt Installer)
+pip install aqtinstall
+aqt install-qt windows desktop 6.5.3 win64_msvc2019_64 -O C:\Qt
+
+# Install GStreamer from official MSVC runtime installer
+# Download from: https://gstreamer.freedesktop.org/download/
+# Install to: C:\gstreamer\1.0\msvc_x86_64\
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+# Install Qt
+sudo apt install qt6-base-dev qt6-multimedia-dev
+
+# Install GStreamer
+sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+                 libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-ugly \
+                 gstreamer1.0-plugins-good gstreamer1.0-libav \
+                 gstreamer1.0-vaapi gstreamer1.0-gl
+```
 
 ### Initial Setup
 ```bash
@@ -108,7 +133,7 @@ find src -name "*.cpp" | xargs clang-tidy -p build
 ### File Organization
 - **Headers**: `src/yams/*.hpp`
 - **Implementation**: `src/yams/*.cpp`
-- **Tests**: `tests/*_test.cpp`
+- **Tests**: `tests/*Test.cpp` and `src/yams/*Test.cpp`
 - **Shaders**: `resources/shaders/*.glsl`
 
 ### Naming Conventions
@@ -204,8 +229,11 @@ std::optional<MediaFrame> loadFrame(const QString& path) {
 - Verify PulseAudio/ALSA compatibility
 
 ### Windows
-- Use MinGW or MSVC compiler
-- Test DirectShow integration if using FFmpeg
+- **Primary production platform** - all features must build and run on Windows
+- Use MSVC compiler (2019 or later)
+- Hardware acceleration via D3D11VA (GStreamer `d3d11` plugin)
+- Bundle GStreamer and Qt DLLs alongside executable for deployment
+- CI builds on Windows runners with GitHub Actions
 
 ## Git Workflow
 
