@@ -38,8 +38,11 @@ jobs:
       - name: Check CMake formatting
         run: |
           echo "Checking CMakeLists.txt formatting..."
-          # Check all CMakeLists.txt files
-          find . -name "CMakeLists.txt" -exec cmake-format --check {} +
+          # Check CMakeLists.txt files in src/, excluding build and 3rdparty
+          find . -name "CMakeLists.txt" \
+            -not -path "./build/*" \
+            -not -path "./3rdparty/*" \
+            -exec cmake-format --check {} +
           echo "✓ CMake formatting check passed"
 
   build-and-test:
