@@ -281,9 +281,20 @@ yams/
     └── ci/                     # CI helper scripts (DLL bundling, etc.)
 ```
 
-## Development Phases (High-Level)
+## Development Phases
 
-Detailed Roadmap will be done soon.
+See [ROADMAP.md](ROADMAP.md) for detailed phase breakdown, task lists, and current progress.
+
+**High-level phase overview**:
+- **Phase 0**: Foundation - Stack validation (Qt + GStreamer + OpenGL) and CI/CD setup
+- **Phase 1**: Single layer media playback with hardware acceleration
+- **Phase 2**: Multi-layer composition, opacity control, and transitions
+- **Phase 3**: Live control architecture with keyboard bindings and UI feedback
+- **Phase 4**: GUI styling for live events (custom dark theme)
+- **Phase 5**: Protocol support (OSC, sACN, MIDI, ArtNet)
+- **Phase 6**: CITP support for lighting console interoperability (GrandMA 3/2)
+
+Each phase includes full Linux and Windows testing/deployment. Flatpak packaging added in Phase 0.
 
 ## Design Constraints & Trade-offs
 
@@ -344,6 +355,6 @@ These will be addressed during detailed planning and prototyping.
 
 ---
 
-**Document Status**: Living document, updated as decisions are made.
-**Last Updated**: 2026-01-26
-**Next Review**: After Phase 1 completion (foundation)
+**Document Status**: Living document, updated as decisions are made.  
+**Last Updated**: 2026-01-26  
+**Next Review**: After each phase completion (see [ROADMAP.md](ROADMAP.md))
