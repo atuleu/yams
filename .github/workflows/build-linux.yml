@@ -1,0 +1,115 @@
+name: Linux Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  format-check:
+    name: Code Formatting Check
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install formatting tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format python3-pip
+          pip3 install cmake-format pyyaml
+
+      - name: Check C++ formatting
+        run: |
+          echo "Checking C++ files formatting..."
+          # Find all .cpp and .hpp files and check formatting
+          find src -type f \( -name "*.cpp" -o -name "*.hpp" \) -print0 | \
+            xargs -0 clang-format --dry-run --Werror --style=file
+          echo "✓ C++ formatting check passed"
+
+      - name: Check CMake formatting
+        run: |
+          echo "Checking CMakeLists.txt formatting..."
+          # Check all CMakeLists.txt files
+          find . -name "CMakeLists.txt" -exec cmake-format --check {} +
+          echo "✓ CMake formatting check passed"
+
+  build-and-test:
+    name: Build and Test (GCC, RelWithDebInfo)
+    runs-on: ubuntu-24.04
+    needs: format-check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-packages-${{ runner.os }}-ubuntu-24.04-${{ hashFiles('.github/workflows/build-linux.yml') }}
+          restore-keys: |
+            apt-packages-${{ runner.os }}-ubuntu-24.04-
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            qt6-base-dev \
+            libqt6core6 \
+            libqt6gui6 \
+            libqt6widgets6 \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build and run tests
+        run: |
+          cmake --build build --parallel
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-failure
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/*.log
+          retention-days: 30
+
+      - name: Upload binaries
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yams-linux-binaries
+          path: |
+            build/src/yams/yams
+          retention-days: 7
+
+      - name: Display build summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **OS**: Ubuntu 24.04" >> $GITHUB_STEP_SUMMARY
+          echo "- **Compiler**: GCC $(g++ --version | head -n1 | awk '{print $NF}')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Type**: RelWithDebInfo" >> $GITHUB_STEP_SUMMARY
+          echo "- **CMake Version**: $(cmake --version | head -n1 | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Qt Version**: $(qmake6 --version | grep 'Qt version' | awk '{print $4}')" >> $GITHUB_STEP_SUMMARY
+          if [ -f build/src/yams/yams ]; then
+            echo "- **Binary Size**: $(du -h build/src/yams/yams | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
+          fi
