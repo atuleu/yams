@@ -14,15 +14,20 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets)
 
 # Fetch dependencies
 include(FetchContent)
-
-# Fetch slogpp header-only logging library
-FetchContent_Declare(
-	slogpp
-	GIT_REPOSITORY https://github.com/atuleu/slogpp.git
-	GIT_TAG 2aac2dd844471323d8b62704768610b85ef31f3e
-	GIT_SHALLOW TRUE
-)
-
+if(EXISTS ${PROJECT_SOURCE_DIR}/3rdparty/slogpp)
+	# Use local slogpp for in-tree development
+	FetchContent_Declare(
+		slogpp SOURCE_DIR ${PROJECT_SOURCE_DIR}/3rdparty/slogpp
+	)
+else()
+	# Fetch slogpp header-only logging library
+	FetchContent_Declare(
+		slogpp
+		GIT_REPOSITORY https://github.com/atuleu/slogpp.git
+		GIT_TAG 41c0c459e3a3fcddd405e74f78031f02a33d3f7d
+		GIT_SHALLOW TRUE
+	)
+endif()
 # Fetch GoogleTest framework
 FetchContent_Declare(
 	googletest
@@ -30,6 +35,7 @@ FetchContent_Declare(
 	GIT_TAG 52eb8108c5bdec04579160ae17225d66034bd723
 	GIT_SHALLOW TRUE
 )
+
 # Prevent GoogleTest from overriding compiler/linker options
 set(gtest_force_shared_crt
 	ON
@@ -42,6 +48,8 @@ FetchContent_MakeAvailable(slogpp googletest)
 enable_testing()
 
 include(GoogleTest)
+
+add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --output-on-failure)
 
 # Add source subdirectory
 add_subdirectory(src/yams)
