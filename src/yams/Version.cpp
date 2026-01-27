@@ -2,7 +2,7 @@
 #include "git.h"
 
 namespace yams {
-std::string GetVersion() {
+std::string Version() {
 	if (git::AnyUncommittedChanges()) {
 		return std::string{git::Describe()} + "-dirty";
 	} else {

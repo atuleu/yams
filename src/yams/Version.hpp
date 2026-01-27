@@ -3,6 +3,6 @@
 
 namespace yams {
 
-std::string GetVersion();
+std::string Version();
 
 }
