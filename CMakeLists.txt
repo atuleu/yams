@@ -64,7 +64,11 @@ enable_testing()
 
 include(GoogleTest)
 
-add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
+if(WIN32)
+	add_custom_target(check ${CMAKE_CTEST_COMMAND} ARGS --verbose)
+else()
+	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
+endif()
 
 # Add source subdirectory
 add_subdirectory(src/yams)

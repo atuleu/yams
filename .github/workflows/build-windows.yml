@@ -68,7 +68,7 @@ jobs:
       - name: Build and run tests
         shell: cmd
         run: |
-          cmake --build build --parallel
+          cmake --build build --parallel --target check
 
       - name: Package with CPack (NSIS)
         shell: cmd
