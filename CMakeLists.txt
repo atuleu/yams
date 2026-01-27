@@ -81,6 +81,18 @@ else()
 	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
 endif()
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(
+	gstreamer
+	REQUIRED
+	IMPORTED_TARGET
+	glib-2.0
+	gio-2.0
+	gobject-2.0
+	gstreamer-1.0
+	gstreamer-app-1.0
+)
+
 # Add source subdirectory
 add_subdirectory(src/yams)
 

@@ -13,8 +13,13 @@ add_library(yams-common STATIC ${SRC_FILES} ${SRC_HEADERS})
 target_include_directories(yams-common PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(
-	yams-common PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets slog++::slog++
-					   cmake_git_version_tracking
+	yams-common
+	PUBLIC Qt6::Core #
+		   Qt6::Gui #
+		   Qt6::Widgets
+		   slog++::slog++
+		   cmake_git_version_tracking
+		   PkgConfig::gstreamer
 )
 
 if(WIN32)

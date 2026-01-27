@@ -38,9 +38,10 @@ jobs:
           pip install aqtinstall
           aqt install-qt windows desktop 6.9.3 win64_msvc2022_64 -O ${{ github.workspace }}/Qt
 
-      - name: Install NSIS via Chocolatey
+      - name: Install NSIS and PkgConfig via Chocolatey
         run: |
           choco install nsis -y
+          choco install pkgconfiglite -y
 
       - name: Add NSIS to PATH
         shell: powershell
@@ -51,6 +52,67 @@ jobs:
         shell: powershell
         run: |
           Get-Command makensis
+
+      - name: Cache GStreamer
+        id: cache-gstreamer
+        uses: actions/cache@v4
+        with:
+          path: D:/gstreamer
+          key: gstreamer-1.24.13-windows-msvc2019-${{ runner.os }}
+
+
+      - name: Install GStreamer
+        if: steps.cache-gstreamer.outputs.cache-hit != 'true'
+        shell: powershell
+        run: |
+
+          $gstVersion = "1.24.13"
+          $baseUrl = "https://gstreamer.freedesktop.org/data/pkg/windows/$gstVersion/msvc"
+
+          # Use curl.exe explicitly to bypass PowerShell alias
+          curl.exe -L -o gst-runtime.msi "$baseUrl/gstreamer-1.0-msvc-x86_64-$gstVersion.msi"
+          curl.exe -L -o gst-devel.msi "$baseUrl/gstreamer-1.0-devel-msvc-x86_64-$gstVersion.msi"
+
+          # Verify downloads
+          Write-Host "Runtime MSI size: $((Get-Item gst-runtime.msi).Length) bytes"
+          Write-Host "Devel MSI size: $((Get-Item gst-devel.msi).Length) bytes"
+
+          Write-Host "Installing runtime..."
+          $proc1 = Start-Process msiexec.exe -Wait -ArgumentList '/i gst-runtime.msi /qn /norestart /l*v runtime-install.log'
+          Write-Host "Runtime install exit code: $($proc1.ExitCode)"
+
+          Write-Host "Installing devel..."
+          $proc2 = Start-Process msiexec.exe -Wait -ArgumentList '/i gst-devel.msi /qn /norestart /l*v devel-install.log'
+          Write-Host "Devel install exit code: $($proc2.ExitCode)"
+
+          # Search for GStreamer installation
+          Write-Host "`nSearching for GStreamer files..."
+          Get-ChildItem C:\ -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*gst*" -or $_.Name -like "*stream*" }
+
+          # Check common installation paths
+          $possiblePaths = @(
+          "C:\gstreamer",
+          "D:\gstreamer",
+          "C:\Program Files\GStreamer",
+          "C:\Program Files (x86)\GStreamer",
+          "${env:ProgramFiles}\GStreamer",
+          "${env:ProgramFiles(x86)}\GStreamer",
+          "${env:LOCALAPPDATA}\GStreamer"
+          )
+
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              Write-Host "Found GStreamer at: $path"
+            }
+          }
+
+
+      - name: Adds GStreamer to PkgConfig Path
+        shell:  powershell
+        run : |
+          $env:PKG_CONFIG_PATH = "D:\gstreamer\1.0\msvc_x86_64\lib\pkgconfig"
+          echo "PKG_CONFIG_PATH=$env:PKG_CONFIG_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "D:\gstreamer\1.0\msvc_x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -65,7 +127,8 @@ jobs:
             -G "Ninja" ^
             -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}\Qt\6.9.3\msvc2022_64 ^
-            -DCMAKE_CXX_COMPILER=cl
+            -DCMAKE_CXX_COMPILER=cl ^
+            -DCMAKE_C_COMPILER=cl
 
       - name: Build and run tests
         shell: cmd
