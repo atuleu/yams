@@ -93,6 +93,23 @@ set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 
 set(CPACK_NSIS_MODIFY_PATH OFF)
 
+# Add "Run YAMS" checkbox on finish page
+set(CPACK_NSIS_MUI_FINISHPAGE_RUN "yams.exe")
+
+# Create desktop shortcut during installation
+set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
+	"
+	CreateShortCut '$DESKTOP\\\\YAMS.lnk' '$INSTDIR\\\\bin\\\\yams.exe'
+"
+)
+
+# Remove desktop shortcut during uninstallation
+set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
+	"
+	Delete '$DESKTOP\\\\YAMS.lnk'
+"
+)
+
 set(_icon "${PROJECT_SOURCE_DIR}/resources/icons/yams.ico")
 set(_uninstall_icon "${PROJECT_SOURCE_DIR}/resources/icons/yams-uninstall.ico")
 
