@@ -99,14 +99,14 @@ set(CPACK_NSIS_MUI_FINISHPAGE_RUN "yams.exe")
 # Create desktop shortcut during installation
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
 	"
-	CreateShortCut '$DESKTOP\\\\YAMS.lnk' '$INSTDIR\\\\bin\\\\yams.exe'
+	CreateShortCut '$DESKTOP\\\\YAMS ${CPACK_PACKAGE_VERSION}.lnk' '$INSTDIR\\\\bin\\\\yams.exe'
 "
 )
 
 # Remove desktop shortcut during uninstallation
 set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
 	"
-	Delete '$DESKTOP\\\\YAMS.lnk'
+	Delete '$DESKTOP\\\\YAMS ${CPACK_PACKAGE_VERSION}.lnk'
 "
 )
 
