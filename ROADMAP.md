@@ -2,7 +2,7 @@
 
 This document outlines the development phases for YAMS, with detailed task breakdown for each phase. Each phase includes Linux and Windows testing/deployment to ensure cross-platform compatibility throughout development.
 
-**Current Phase**: Phase 0.1 (CMake + Qt Hello World + CI/CD) - Nearly Complete
+**Current Phase**: Phase 0.2 (GStreamer Integration) - Starting
 **Last Updated**: 2026-01-27
 
 ---
@@ -41,12 +41,12 @@ This document outlines the development phases for YAMS, with detailed task break
   - [x] Run tests
   - [x] Bundle NSIS Installer
   - [x] Cache Qt installation
-- [ ] **Flatpak CI**: Setup build workflow
-  - [ ] Create Flatpak manifest
-  - [ ] Build Flatpak in CI
-  - [ ] Produce Flatpak artifact
+- [x] **Flatpak CI**: Setup build workflow
+  - [x] Create Flatpak manifest
+  - [x] Build Flatpak in CI
+  - [x] Produce Flatpak artifact
 - [x] **Manual testing**: Download Windows installer artifact, verify it runs
-- [ ] **Manual testing**: Install Flatpak artifact, verify it runs
+- [x] **Manual testing**: Install Flatpak artifact, verify it runs
 
 **Deliverables**:
 - Minimal Qt application that displays a window
@@ -58,6 +58,8 @@ This document outlines the development phases for YAMS, with detailed task break
 - All three artifacts tested manually and working
 
 **Phase 0.1 Complete When**: CI is green on all platforms, all three artifacts downloadable and runnable.
+
+**Status**: ✅ **COMPLETE** (v0.1.0 - 2026-01-27)
 
 ---
 
