@@ -2,8 +2,8 @@
 
 This document outlines the development phases for YAMS, with detailed task breakdown for each phase. Each phase includes Linux and Windows testing/deployment to ensure cross-platform compatibility throughout development.
 
-**Current Phase**: Phase 0 (Foundation)
-**Last Updated**: 2026-01-26
+**Current Phase**: Phase 0.1 (CMake + Qt Hello World + CI/CD) - Nearly Complete
+**Last Updated**: 2026-01-27
 
 ---
 
@@ -29,24 +29,23 @@ This document outlines the development phases for YAMS, with detailed task break
 - [x] Add Qt6 dependency detection (find_package)
 - [x] Create minimal Qt application displaying "Hello YAMS" window
 - [x] Add basic logging output (using slog++)
-- [ ] Add GoogleTest dependency and create sample test (tests build system)
-- [ ] **Linux CI**: Setup GitHub Actions workflow
-  - [ ] Install Qt6 and build dependencies
-  - [ ] Build project
-  - [ ] Run tests
-  - [ ] Cache dependencies for faster rebuilds
-- [ ] **Windows CI**: Setup GitHub Actions workflow
-  - [ ] Install Qt via aqt
-  - [ ] Build with MSVC
-  - [ ] Run tests
-  - [ ] Bundle Qt DLLs (windeployqt)
-  - [ ] Create .zip artifact
-  - [ ] Cache Qt installation
+- [x] Add GoogleTest dependency and create sample test (tests build system)
+- [x] **Linux CI**: Setup GitHub Actions workflow
+  - [x] Install Qt6 and build dependencies
+  - [x] Build project
+  - [x] Run tests
+  - [x] Cache dependencies for faster rebuilds
+- [x] **Windows CI**: Setup GitHub Actions workflow
+  - [x] Install Qt via aqt
+  - [x] Build with MSVC
+  - [x] Run tests
+  - [x] Bundle NSIS Installer
+  - [x] Cache Qt installation
 - [ ] **Flatpak CI**: Setup build workflow
   - [ ] Create Flatpak manifest
   - [ ] Build Flatpak in CI
   - [ ] Produce Flatpak artifact
-- [ ] **Manual testing**: Download Windows .zip artifact, verify it runs
+- [x] **Manual testing**: Download Windows installer artifact, verify it runs
 - [ ] **Manual testing**: Install Flatpak artifact, verify it runs
 
 **Deliverables**:
@@ -54,7 +53,7 @@ This document outlines the development phases for YAMS, with detailed task break
 - CMake build system that finds Qt6
 - Basic test infrastructure (GoogleTest + CTest)
 - GitHub Actions CI for Linux (tests pass)
-- GitHub Actions CI for Windows (produces .zip artifact with DLLs)
+- GitHub Actions CI for Windows (produces .exe installer)
 - GitHub Actions CI for Flatpak (produces .flatpak artifact)
 - All three artifacts tested manually and working
 
@@ -859,15 +858,52 @@ Each phase should complete this checklist before moving to the next:
 
 ## Version Milestones
 
-Suggested versioning aligned with phases:
+Versioning scheme aligned with phases and sub-phases:
 
-- **v0.1.0**: Phase 0 complete (Foundation)
-- **v0.2.0**: Phase 1 complete (Single layer playback)
-- **v0.3.0**: Phase 2 complete (Multi-layer + transitions)
-- **v0.4.0**: Phase 3 complete (Live control + UI feedback)
-- **v0.5.0**: Phase 4 complete (GUI styling)
-- **v0.6.0**: Phase 5 complete (OSC/sACN/ArtNet)
-- **v1.0.0**: Phase 6 complete (CITP + GrandMA integration) - **First stable release**
+### Phase 0: Foundation (v0.1.x)
+- **v0.1.0**: Phase 0.1 complete (CMake + Qt Hello World + CI/CD)
+- **v0.1.1**: Phase 0.2 complete (GStreamer Integration)
+- **v0.1.2**: Phase 0.3 complete (OpenGL Rendering)
+- **v0.1.3**: Phase 0.4 complete (Qt + GStreamer + OpenGL Integration)
+
+### Phase 1: Single Layer Media Playback (v0.2.x)
+- **v0.2.0**: Phase 1.1 complete (GStreamer to OpenGL Pipeline)
+- **v0.2.1**: Phase 1.2 complete (Video Texture Rendering)
+- **v0.2.2**: Phase 1.3 complete (Playback Controls)
+- **v0.2.3**: Phase 1.4 complete (Hardware Acceleration Validation)
+
+### Phase 2: Multi-Layer Composition & Transitions (v0.3.x)
+- **v0.3.0**: Phase 2.1 complete (Multi-Layer Architecture)
+- **v0.3.1**: Phase 2.2 complete (Opacity & Alpha Blending)
+- **v0.3.2**: Phase 2.3 complete (Playback Speed Control)
+- **v0.3.3**: Phase 2.4 complete (Crossfade Transitions)
+- **v0.3.4**: Phase 2.5 complete (Performance Optimization & Validation)
+
+### Phase 3: Live Control Architecture & UI Feedback (v0.4.x)
+- **v0.4.0**: Phase 3.1 complete (Control Abstraction Layer)
+- **v0.4.1**: Phase 3.2 complete (Keyboard Bindings & Configuration)
+- **v0.4.2**: Phase 3.3 complete (Live Feedback UI)
+- **v0.4.3**: Phase 3.4 complete (Asset Management)
+
+### Phase 4: GUI Styling for Live Events (v0.5.x)
+- **v0.5.0**: Phase 4.1 complete (Design System & Color Palette)
+- **v0.5.1**: Phase 4.2 complete (Qt Stylesheet Implementation)
+- **v0.5.2**: Phase 4.3 complete (Custom Widgets & Polish)
+
+### Phase 5: Protocol Support (v0.6.x)
+- **v0.6.0**: Phase 5.1 complete (OSC Protocol)
+- **v0.6.1**: Phase 5.2 complete (sACN Protocol)
+- **v0.6.2**: Phase 5.3 complete (MIDI Protocol - optional)
+- **v0.6.3**: Phase 5.4 complete (ArtNet Protocol)
+- **v0.6.4**: Phase 5.5 complete (Protocol Configuration & Testing)
+
+### Phase 6: CITP Support & Lighting Console Interoperability (v0.7.x → v1.0.0)
+- **v0.7.0**: Phase 6.1 complete (CITP Protocol Research & Planning)
+- **v0.7.1**: Phase 6.2 complete (CITP/PINF - Peer Discovery)
+- **v0.7.2**: Phase 6.3 complete (CITP/MSEX - Media Server Extensions)
+- **v0.7.3**: Phase 6.4 complete (Thumbnail Generation & Streaming)
+- **v0.7.4**: Phase 6.5 complete (GrandMA Integration Testing)
+- **v1.0.0**: Phase 6.6 complete (GrandMA 2 Compatibility & Configuration) - **First stable release**
 
 ---
 
@@ -877,4 +913,4 @@ Suggested versioning aligned with phases:
 - [x] Complete
 - [!] Blocked
 
-**Next Steps**: Begin Phase 0.1 - CMake + Qt Hello World + CI/CD Setup
+**Next Steps**: Complete Phase 0.1 manual testing, then begin Phase 0.2 - GStreamer Integration
