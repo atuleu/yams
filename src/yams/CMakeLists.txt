@@ -44,6 +44,7 @@ install(
 )
 
 if(WIN32)
+	set_target_properties(yams PROPERTIES WIN32_EXECUTABLE TRUE)
 	qt_generate_deploy_script(
 		TARGET
 		yams
