@@ -12,7 +12,12 @@ target_link_libraries(
 	yams-common PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets slog++::slog++
 )
 
-add_executable(yams main.cpp)
+if(WIN32)
+	configure_file(yams.rc.in yams.rc @ONLY)
+endif()
+
+add_executable(yams $<$<PLATFORM_ID:Windows>:yams.rc> main.cpp)
+
 target_link_libraries(yams PRIVATE yams-common)
 
 add_executable(yams-tests ${SRC_TESTS_FILES})
