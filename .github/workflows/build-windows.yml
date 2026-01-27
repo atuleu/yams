@@ -17,7 +17,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -100,13 +101,32 @@ jobs:
           path: build/YAMS-*-win64.exe
           retention-days: 7
 
+      - name: Extract tag message
+        if: success() && startsWith(github.ref, 'refs/tags/v')
+        id: tag_message
+        shell: bash
+        run: |
+          git fetch --force --tags origin
+          TAG_SUBJECT=$(git for-each-ref --format='%(contents:subject)' ${{ github.ref }})
+          TAG_BODY=$(git for-each-ref --format='%(contents:body)' ${{ github.ref }})
+
+          echo "title=${TAG_SUBJECT}" >> $GITHUB_OUTPUT
+
+          # Use heredoc for multiline body
+          {
+            echo 'body<<EOF'
+            echo "${TAG_BODY}"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
       - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: build/YAMS-*-win64.exe
           draft: true
-          generate_release_notes: true
+          name: ${{ steps.tag_message.outputs.title }}
+          body: ${{ steps.tag_message.outputs.body }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

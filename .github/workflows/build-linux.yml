@@ -156,13 +156,12 @@ jobs:
           path: io.github.atuleu.YAMS.flatpak
           retention-days: 7
 
-      - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Upload Flatpak to GitHub Release
+        if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: io.github.atuleu.YAMS.flatpak
           draft: true
-          generate_release_notes: true
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
