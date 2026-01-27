@@ -2,9 +2,7 @@ set(SRC_FILES Logging.cpp)
 
 set(SRC_HEADERS Logging.hpp)
 
-set(SRC_TESTS_FILES LoggingTest.cpp #
-					main-check.cpp #
-)
+set(SRC_TESTS_FILES LoggingTest.cpp)
 
 add_library(yams-common STATIC ${SRC_FILES} ${SRC_HEADERS})
 
@@ -19,16 +17,20 @@ target_link_libraries(yams PRIVATE yams-common)
 
 add_executable(yams-tests ${SRC_TESTS_FILES})
 
-target_link_libraries(yams-tests yams-common GTest::gtest GTest::gmock)
+target_link_libraries(yams-tests yams-common GTest::gmock_main)
 
+set_target_properties(
+	yams-common yams yams-tests
+	PROPERTIES AUTOMOC ON
+			   AUTOUIC ON
+			   AUTORCC ON
+)
+
+add_test(NAME yams-all-tests COMMAND yams-tests)
 if(WIN32)
-	add_test(NAME yams-all-tests COMMAND yams-tests)
 	set_tests_properties(
 		yams-all-tests
 		PROPERTIES ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
 	)
-else()
-	gtest_discover_tests(yams-tests DISCOVERY_MODE PRE_TEST)
 endif()
-
 add_dependencies(check yams-tests)

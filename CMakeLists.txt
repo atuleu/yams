@@ -11,6 +11,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find Qt6 (>= 6.4 for Ubuntu 22.04 compatibility)
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets)
+qt_standard_project_setup()
+set(CMAKE_AUTOMOC OFF)
+set(CMAKE_AUTOUIC OFF)
+set(CMAKE_AUTORCC OFF)
 
 # Fetch dependencies
 include(FetchContent)
@@ -50,10 +54,7 @@ enable_testing()
 
 include(GoogleTest)
 
-if(WIN32)
-	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
-else()
-	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --output-on-failure)
-endif()
+add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
+
 # Add source subdirectory
 add_subdirectory(src/yams)
