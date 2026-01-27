@@ -69,6 +69,8 @@ add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
 # Add source subdirectory
 add_subdirectory(src/yams)
 
+add_subdirectory(resources/icons)
+
 # CPack configuration (NSIS on Windows)
 set(CPACK_GENERATOR "NSIS")
 set(CPACK_PACKAGE_NAME "YAMS")
@@ -86,13 +88,18 @@ set(CPACK_PACKAGE_EXECUTABLES "yams" "YAMS: Yet Another Media Server")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 
 set(CPACK_NSIS_MODIFY_PATH OFF)
-# set(CPACK_NSIS_MUI_ICON
-# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
-# set(CPACK_NSIS_MUI_UNIICON
-# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
-# set(CPACK_NSIS_INSTALLED_ICON_NAME
-# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
-# set(CPACK_PACKAGE_ICON
-# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
+
+set(_icon "${PROJECT_SOURCE_DIR}/resources/icons/yams.ico")
+set(_uninstall_icon "${PROJECT_SOURCE_DIR}/resources/icons/yams-uninstall.ico")
+
+file(TO_NATIVE_PATH "${_icon}" _icon_native)
+file(TO_NATIVE_PATH "${_uninstall_icon}" _uninstall_native)
+
+set(CPACK_NSIS_MUI_ICON "${_icon_native}")
+set(CPACK_NSIS_MUI_UNIICON "${_uninstall_native}")
+
+set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\yams.exe")
+
+set(CPACK_PACKAGE_ICON "${_icon_native}")
 
 include(CPack)

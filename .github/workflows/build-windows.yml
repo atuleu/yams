@@ -83,6 +83,12 @@ jobs:
           path: |
             build/Testing/Temporary/LastTest.log
             build/Testing/Temporary/*.log
+            build/CPackOutput.log
+            build/CPackError.log
+            build/CPackConfig.cmake
+            build/_CPack_Packages/**/NSIS/*.log
+            build/_CPack_Packages/**/NSIS/*.nsi
+
           retention-days: 30
 
       - name: Upload Windows installer
