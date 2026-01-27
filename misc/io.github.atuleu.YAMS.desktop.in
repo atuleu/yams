@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=YAMS: Yet Another Media Server
+Comment=Minimalist media server for live events
+Exec=yams
+Icon=io.github.atuleu.YAMS
+Type=Application
+Terminal=false
+Categories=AudioVideo;Video;Presentation;Midi;Player;Qt;
+Keywords=media;server;live;presentation;video;mixing;VJ;

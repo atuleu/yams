@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.atuleu.YAMS</id>
+
+  <name>YAMS: Yet Another Media Server</name>
+  <summary>YAMS is a simplistic but well integrated Media Server for small venues</summary>
+
+  <metadata_license>CC-BY-SA-4.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <recommends>
+    <display_length compare="ge">1080</display_length>
+  </recommends>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+
+  <description>
+    <p>
+      YAMS: Yet Another Media Server is a minimalist but well-integrated media server solution. 
+      It aims to support small venues that cannot spend large amounts to license complete 
+      media server or VJing solutions for live events.
+    </p>
+    <p>Planned features include:</p>
+    <ul>
+      <li>Support for 1-3 video layers with independent playback</li>
+      <li>Simple composition with opacity control and crossfade transitions</li>
+      <li>Playback speed control per layer (0.5x - 2.0x)</li>
+      <li>Hardware-accelerated video decoding on Linux and Windows</li>
+      <li>Control via MIDI, OSC, sACN, and ArtNet protocols</li>
+      <li>CITP support for professional lighting console integration (GrandMA 3)</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.atuleu.YAMS.desktop</launchable>
+
+  <releases>
+    <release version="0.1.0" date="2026-01-27">
+      <description>
+        <p>Initial development release (Phase 0.1 complete)</p>
+        <ul>
+          <li>Basic Qt application with logging</li>
+          <li>CMake build system with GoogleTest integration</li>
+          <li>Linux and Windows CI/CD with NSIS installer</li>
+          <li>Application icons and branding</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+
+  <url type="homepage">https://github.com/atuleu/yams</url>
+  <url type="bugtracker">https://github.com/atuleu/yams/issues</url>
+
+  <content_rating type="oars-1.1" />
+  <developer id="io.github.atuleu">
+    <name>Alexandre Tuleu</name>
+  </developer>
+</component>

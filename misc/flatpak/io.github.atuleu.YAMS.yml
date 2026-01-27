@@ -1,0 +1,43 @@
+id: io.github.atuleu.YAMS
+runtime: org.kde.Platform
+runtime-version: '6.9'
+sdk: org.kde.Sdk
+add-extensions:
+  # will most likely need extension for gstreamer.
+command: yams
+finish-args:
+  # X11 + XShm access
+  - --share=ipc
+  - --socket=fallback-x11
+  # Wayland access
+  - --socket=wayland
+  # OpenGL rendering (Phase 0.3+)
+  - --device=dri
+  # Network access for control protocols (Phase 5: OSC/sACN/ArtNet/CITP)
+  - --share=network
+  # Media file access
+  - --filesystem=xdg-videos:ro
+  - --filesystem=xdg-pictures:ro
+  - --filesystem=xdg-music:ro
+  # Project file storage
+  - --filesystem=xdg-documents
+  # App-specific config, cache, and data
+  - --filesystem=xdg-config/io.github.atuleu.YAMS:create
+  - --filesystem=xdg-cache/io.github.atuleu.YAMS:create
+  - --filesystem=xdg-data/io.github.atuleu.YAMS:create
+
+modules:
+  - name: yams
+    buildsystem: cmake
+    builddir: true
+    config-opts:
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DXDESKTOP_APPSTREAM_SUPPORT=On
+    build-options:
+      # need to access git subrepo for slog++
+      build-args:
+        - --share=network
+    sources:
+      - type: dir
+        path: ../..

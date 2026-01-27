@@ -75,6 +75,8 @@ add_subdirectory(src/yams)
 
 add_subdirectory(resources/icons)
 
+add_subdirectory(misc)
+
 # CPack configuration (NSIS on Windows)
 set(CPACK_GENERATOR "NSIS")
 set(CPACK_PACKAGE_NAME "YAMS")
