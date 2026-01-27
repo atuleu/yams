@@ -27,10 +27,30 @@ set_target_properties(
 )
 
 add_test(NAME yams-all-tests COMMAND yams-tests)
+add_dependencies(check yams-tests)
+
 if(WIN32)
 	set_tests_properties(
 		yams-all-tests
 		PROPERTIES ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
 	)
+
 endif()
-add_dependencies(check yams-tests)
+
+install(
+	TARGETS yams
+	BUNDLE DESTINATION .
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+if(WIN32)
+	qt_generate_deploy_script(
+		TARGET
+		yams
+		OUTPUT_SCRIPT
+		yams_deploy_script
+		CONTENT
+		"qt_deploy_runtime_dependencies(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)"
+	)
+	install(SCRIPT ${yams_deploy_script})
+endif()
