@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(
 	yams
 	VERSION 0.1.0
-	LANGUAGES CXX
+	LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -57,7 +57,16 @@ set(INSTALL_GMOCK
 	CACHE BOOL "" FORCE
 )
 
-FetchContent_MakeAvailable(slogpp googletest)
+FetchContent_Declare(
+	cmake_git_version_tracking
+	GIT_REPOSITORY
+		https://github.com/andrew-hardin/cmake-git-version-tracking.git
+	GIT_TAG 6c0cb87edd029ddfb403a8e24577c144a03605a6
+)
+
+FetchContent_MakeAvailable(slogpp googletest cmake_git_version_tracking)
+
+message(STATUS "Found current version: ${GIT_DESCRIBE}")
 
 # Enable testing
 enable_testing()

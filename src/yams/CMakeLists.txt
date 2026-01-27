@@ -1,6 +1,10 @@
-set(SRC_FILES Logging.cpp)
+set(SRC_FILES Logging.cpp #
+			  Version.cpp
+)
 
-set(SRC_HEADERS Logging.hpp)
+set(SRC_HEADERS Logging.hpp #
+				Version.hpp
+)
 
 set(SRC_TESTS_FILES LoggingTest.cpp)
 
@@ -10,6 +14,7 @@ target_include_directories(yams-common PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(
 	yams-common PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets slog++::slog++
+					   cmake_git_version_tracking
 )
 
 if(WIN32)
