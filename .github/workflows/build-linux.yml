@@ -122,3 +122,45 @@ jobs:
           if [ -f build/src/yams/yams ]; then
             echo "- **Binary Size**: $(du -h build/src/yams/yams | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
           fi
+
+  flatpak:
+    name: Flatpak Build
+    runs-on: ubuntu-latest
+    needs:
+      - format-check
+      - build-and-test
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.9
+      options: --privileged
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Build Flatpak
+        id: flatpak-builder
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: io.github.atuleu.YAMS.flatpak
+          manifest-path: misc/flatpak/io.github.atuleu.YAMS.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Upload Flatpak bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yams-linux-flatpak
+          path: io.github.atuleu.YAMS.flatpak
+          retention-days: 7
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-build-logs-failure
+          path: |
+            .flatpak-builder/build/**/meson-logs/*.txt
+            .flatpak-builder/build/**/*.log
+          retention-days: 30
