@@ -47,6 +47,16 @@ set(gtest_force_shared_crt
 	CACHE BOOL "" FORCE
 )
 
+# Prevent Installation of Googletest. We won't deploy tests in CPack
+set(INSTALL_GTEST
+	OFF
+	CACHE BOOL "" FORCE
+)
+set(INSTALL_GMOCK
+	OFF
+	CACHE BOOL "" FORCE
+)
+
 FetchContent_MakeAvailable(slogpp googletest)
 
 # Enable testing
@@ -58,3 +68,31 @@ add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
 
 # Add source subdirectory
 add_subdirectory(src/yams)
+
+# CPack configuration (NSIS on Windows)
+set(CPACK_GENERATOR "NSIS")
+set(CPACK_PACKAGE_NAME "YAMS")
+set(CPACK_PACKAGE_VENDOR "io.github.atuleu")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Yet Another Media Server")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/atuleu/yams")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY
+	"YAMS ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+)
+set(CPACK_NSIS_DISPLAY_NAME "YAMS: Yet Another Media Server")
+set(CPACK_NSIS_PACKAGE_NAME "YAMS: Yet Another Media Server")
+set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+set(CPACK_PACKAGE_EXECUTABLES "yams" "YAMS: Yet Another Media Server")
+set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+
+set(CPACK_NSIS_MODIFY_PATH OFF)
+# set(CPACK_NSIS_MUI_ICON
+# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
+# set(CPACK_NSIS_MUI_UNIICON
+# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
+# set(CPACK_NSIS_INSTALLED_ICON_NAME
+# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
+# set(CPACK_PACKAGE_ICON
+# "${PROJECT_SOURCE_DIR}/resources/icons/windows/<system-reminder>")
+
+include(CPack)
