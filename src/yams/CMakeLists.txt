@@ -21,6 +21,14 @@ add_executable(yams-tests ${SRC_TESTS_FILES})
 
 target_link_libraries(yams-tests yams-common GTest::gtest GTest::gmock)
 
-gtest_discover_tests(yams-tests)
+if(WIN32)
+	add_test(NAME yams-all-tests COMMAND yams-tests)
+	set_tests_properties(
+		yams-all-tests
+		PROPERTIES ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
+	)
+else()
+	gtest_discover_tests(yams-tests DISCOVERY_MODE PRE_TEST)
+endif()
 
 add_dependencies(check yams-tests)

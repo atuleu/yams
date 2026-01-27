@@ -28,6 +28,7 @@ else()
 		GIT_SHALLOW TRUE
 	)
 endif()
+
 # Fetch GoogleTest framework
 FetchContent_Declare(
 	googletest
@@ -49,7 +50,10 @@ enable_testing()
 
 include(GoogleTest)
 
-add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --output-on-failure)
-
+if(WIN32)
+	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
+else()
+	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --output-on-failure)
+endif()
 # Add source subdirectory
 add_subdirectory(src/yams)
