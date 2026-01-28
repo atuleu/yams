@@ -25,23 +25,30 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Cache Qt
-        id: cache-qt
-        uses: actions/cache@v4
+      - name: Restore Qt from Cache
+        id: restore-qt
+        uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/Qt
           key: qt-6.9.3-windows-msvc2022-${{ runner.os }}
 
       - name: Install Qt via aqt
-        if: steps.cache-qt.outputs.cache-hit != 'true'
+        if: steps.restore-qt.outputs.cache-hit != 'true'
         run: |
           pip install aqtinstall
           aqt install-qt windows desktop 6.9.3 win64_msvc2022_64 -O ${{ github.workspace }}/Qt
 
+      - name: Cache Qt installation
+        if: steps.restore-qt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/Qt
+          key: qt-6.9.3-windows-msvc2022-${{ runner.os }}
+
       - name: Install NSIS and PkgConfig via Chocolatey
         run: |
           choco install nsis -y
-          choco install pkgconfiglite -y
+          choco install pkgconfiglite -y --allow-empty-checksums
 
       - name: Add NSIS to PATH
         shell: powershell
@@ -53,16 +60,18 @@ jobs:
         run: |
           Get-Command makensis
 
-      - name: Cache GStreamer
-        id: cache-gstreamer
-        uses: actions/cache@v4
+      - name: Restore GStreamer from cache
+        id: restore-gstreamer
+        uses: actions/cache/restore@v4
         with:
-          path: D:/gstreamer
-          key: gstreamer-1.24.13-windows-msvc2019-${{ runner.os }}
+          path: |
+            D:/gstreamer
+            ${{ github.workspace }}/gst-runtime.msi
+          key: gstreamer-1.24.13-windows-msvc2019-${{ runner.os }}-v2
 
 
       - name: Install GStreamer
-        if: steps.cache-gstreamer.outputs.cache-hit != 'true'
+        if: steps.restore-gstreamer.outputs.cache-hit != 'true'
         shell: powershell
         run: |
 
@@ -106,6 +115,14 @@ jobs:
             }
           }
 
+      - name: Cache GStreamer installation
+        if: steps.restore-gstreamer.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            D:/gstreamer
+            ${{ github.workspace }}/gst-runtime.msi
+          key: gstreamer-1.24.13-windows-msvc2019-${{ runner.os }}-v2
 
       - name: Adds GStreamer to PkgConfig Path
         shell:  powershell
@@ -128,7 +145,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}\Qt\6.9.3\msvc2022_64 ^
             -DCMAKE_CXX_COMPILER=cl ^
-            -DCMAKE_C_COMPILER=cl
+            -DCMAKE_C_COMPILER=cl ^
+            -DGSTREAMER_RUNTIME_INSTALLER=gst-runtime.msi
 
       - name: Build and run tests
         shell: cmd
@@ -145,6 +163,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-logs-failure-windows
+          include-hidden-files: true
           path: |
             build/Testing/Temporary/LastTest.log
             build/Testing/Temporary/*.log
@@ -153,6 +172,7 @@ jobs:
             build/CPackConfig.cmake
             build/_CPack_Packages/**/NSIS/*.log
             build/_CPack_Packages/**/NSIS/*.nsi
+            build/**/*.cmake
 
           retention-days: 30
 

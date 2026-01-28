@@ -121,31 +121,32 @@ set(CPACK_NSIS_MODIFY_PATH OFF)
 # Add "Run YAMS" checkbox on finish page
 set(CPACK_NSIS_MUI_FINISHPAGE_RUN "yams.exe")
 
-# Create desktop shortcut during installation
-set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-	"
-	CreateShortCut '$DESKTOP\\\\YAMS ${CPACK_PACKAGE_VERSION}.lnk' '$INSTDIR\\\\bin\\\\yams.exe'
-"
+set(CPACK_NSIS_MUI_ICON
+	"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams.ico"
 )
-
-# Remove desktop shortcut during uninstallation
-set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-	"
-	Delete '$DESKTOP\\\\YAMS ${CPACK_PACKAGE_VERSION}.lnk'
-"
+set(CPACK_NSIS_MUI_UNIICON
+	"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams-uninstall.ico"
 )
-
-set(_icon "${PROJECT_SOURCE_DIR}/resources/icons/yams.ico")
-set(_uninstall_icon "${PROJECT_SOURCE_DIR}/resources/icons/yams-uninstall.ico")
-
-file(TO_NATIVE_PATH "${_icon}" _icon_native)
-file(TO_NATIVE_PATH "${_uninstall_icon}" _uninstall_native)
-
-set(CPACK_NSIS_MUI_ICON "${_icon_native}")
-set(CPACK_NSIS_MUI_UNIICON "${_uninstall_native}")
 
 set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\yams.exe")
 
-set(CPACK_PACKAGE_ICON "${_icon_native}")
+# Define all NSIS extra commands in one place to avoid overwriting
+set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
+	"
+	CreateShortCut '$DESKTOP\\\\YAMS: Yet Another Media Server ${CPACK_PACKAGE_VERSION}.lnk' '$INSTDIR\\\\bin\\\\yams.exe'
+	ExecWait 'msiexec /i \\\"$INSTDIR\\\\${CMAKE_INSTALL_DATADIR}\\\\gstreamer-1.0-runtime.msi\\\" /passive INSTALLDIR=\\\"$INSTDIR\\\\gstreamer\\\"'
+"
+)
+
+set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
+	"
+	Delete '$DESKTOP\\\\YAMS: Yet Another Media Server ${CPACK_PACKAGE_VERSION}.lnk'
+	ExecWait 'msiexec /x \\\"$INSTDIR\\\\${CMAKE_INSTALL_DATADIR}\\\\gstreamer-1.0-runtime.msi\\\" /passive'
+"
+)
+
+set(CPACK_PACKAGE_ICON
+	"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams.ico"
+)
 
 include(CPack)

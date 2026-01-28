@@ -58,7 +58,41 @@ install(
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+option(
+	GSTREAMER_RUNTIME_INSTALLER
+	"Path to GStreamer runtimer installer for repack. Required for deploying on Windows."
+	""
+)
+
 if(WIN32)
+	if(NOT GSTREAMER_RUNTIME_INSTALLER)
+		message(
+			WARNING
+				"On windows, GSTREAMER_RUNTIME_INSTALLER option is required for install/package targets. These targets will fail."
+		)
+	else()
+		cmake_path(
+			ABSOLUTE_PATH GSTREAMER_RUNTIME_INSTALLER BASE_DIRECTORY
+			"${PROJECT_SOURCE_DIR}" NORMALIZE
+		)
+		if(EXISTS ${GSTREAMER_RUNTIME_INSTALLER})
+			message(
+				STATUS
+					"Will package private gstreamer: ${GSTREAMER_RUNTIME_INSTALLER}"
+			)
+			install(
+				FILES ${GSTREAMER_RUNTIME_INSTALLER}
+				DESTINATION ${CMAKE_INSTALL_DATADIR}
+				RENAME gstreamer-1.0-runtime.msi
+			)
+		else()
+			message(
+				FATAL_ERROR
+					"GStreamer runtime installer not found: ${GSTREAMER_RUNTIME_INSTALLER}"
+			)
+		endif()
+	endif()
+
 	set_target_properties(yams PROPERTIES WIN32_EXECUTABLE TRUE)
 	qt_generate_deploy_script(
 		TARGET
@@ -66,7 +100,10 @@ if(WIN32)
 		OUTPUT_SCRIPT
 		yams_deploy_script
 		CONTENT
-		"qt_deploy_runtime_dependencies(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)"
+		"
+qt_deploy_runtime_dependencies(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)
+"
 	)
+
 	install(SCRIPT ${yams_deploy_script})
 endif()
