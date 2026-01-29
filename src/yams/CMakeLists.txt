@@ -17,6 +17,7 @@ target_link_libraries(
 	PUBLIC Qt6::Core #
 		   Qt6::Gui #
 		   Qt6::Widgets
+		   Qt6::OpenGL
 		   slog++::slog++
 		   cmake_git_version_tracking
 		   PkgConfig::gstreamer

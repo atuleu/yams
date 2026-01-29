@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find Qt6 (>= 6.4 for Ubuntu 22.04 compatibility)
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets OpenGL)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC OFF)
 set(CMAKE_AUTOUIC OFF)
@@ -91,6 +91,7 @@ pkg_check_modules(
 	gobject-2.0
 	gstreamer-1.0
 	gstreamer-app-1.0
+	gstreamer-video-1.0
 )
 
 # Add source subdirectory
