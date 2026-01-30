@@ -1,5 +1,6 @@
 #include <gst/gst.h>
 #include <gst/gstelement.h>
+#include <gst/gstmessage.h>
 #include <gst/video/videooverlay.h>
 
 #include <QApplication>
@@ -55,11 +56,13 @@ template <typename T> struct GstBufferUnrefer {
 template <typename T>
 using glib_owned_ptr = std::unique_ptr<T, GObjectUnrefer<T>>;
 using GstElementPtr  = glib_owned_ptr<GstElement>;
+using GstBusPtr      = glib_owned_ptr<GstBus>;
+using GstMessagePtr  = glib_owned_ptr<GstMessage>;
 
 int main(int argc, char *argv[]) {
 	gst_init(&argc, &argv);
-	QApplication app(argc, argv);
-	app.setQuitOnLastWindowClosed(true);
+	// QApplication app(argc, argv);
+	// app.setQuitOnLastWindowClosed(true);
 
 	auto pipeline = GstElementPtr{gst_pipeline_new("overlayed")};
 	auto source   = gst_element_factory_make("videotestsrc", "source0");
@@ -78,39 +81,70 @@ int main(int argc, char *argv[]) {
 	    slog::String("SHA", git_CommitSHA1())
 	);
 
-	QMainWindow window;
-	window.setWindowTitle(
-	    ("YAMS: Yet Another Media Server " + yams::Version()).c_str()
-	);
-	window.resize(640, 480);
-	window.show();
-	defer {
-		window.hide();
-	};
+	// QMainWindow window;
+	// window.setWindowTitle(
+	//     ("YAMS: Yet Another Media Server " + yams::Version()).c_str()
+	// );
+	// window.resize(640, 480);
+	// window.show();
+	// defer {
+	// 	window.hide();
+	// };
 
-	slog::Info("Main window displayed", slog::Int("winID", window.winId()));
+	// slog::Info("Main window displayed", slog::Int("winID", window.winId()));
 
-	gst_video_overlay_set_window_handle(
-	    GST_VIDEO_OVERLAY(sink),
-	    window.winId()
-	);
+	// gst_video_overlay_set_window_handle(
+	//     GST_VIDEO_OVERLAY(sink),
+	//     window.winId()
+	// );
 
 	slog::Info("starting pipeline");
-	auto sret = GST_STATE_CHANGE_SUCCESS;
-	// right now starting the pipeline makes everything crash with a segfault.
-	// gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
-	slog::Info("pipeline started?");
+	auto sret = gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 	if (sret == GST_STATE_CHANGE_FAILURE) {
 		slog::Error("Could not set pipeline playing");
 		gst_element_set_state(pipeline.get(), GST_STATE_NULL);
 		// quit immediatly.
 
-		QTimer::singleShot(0, [&] { window.close(); });
+		// QTimer::singleShot(0, [&] { window.close(); });
 	}
 
 	defer {
 		gst_element_set_state(pipeline.get(), GST_STATE_NULL);
 	};
 
-	return app.exec();
+	auto bus = GstBusPtr{gst_element_get_bus(pipeline.get())};
+
+	auto msg = GstMessagePtr{gst_bus_timed_pop_filtered(
+	    bus.get(),
+	    4 * 1000000000U,
+	    GstMessageType(GST_MESSAGE_ERROR | GST_MESSAGE_EOS)
+	)};
+
+	if (msg != nullptr) {
+		GError *err;
+		gchar  *debug_info;
+		switch (GST_MESSAGE_TYPE(msg.get())) {
+		case GST_MESSAGE_ERROR:
+			gst_message_parse_error(msg.get(), &err, &debug_info);
+			slog::Error(
+			    "Gst Error message",
+			    slog::String("element", GST_OBJECT_NAME(msg->src)),
+			    slog::String("message", err->message),
+			    slog::String("debug_info", debug_info)
+			);
+			g_clear_error(&err);
+			g_free(&debug_info);
+			break;
+		case GST_MESSAGE_EOS:
+			slog::Info("End-Of-Stream");
+			break;
+		default:
+			slog::Error("unexpected message received");
+			break;
+		}
+	} else {
+		slog::Info("timeouted");
+	}
+
+	return 0;
 }
