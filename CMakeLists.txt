@@ -101,53 +101,59 @@ add_subdirectory(resources/icons)
 
 add_subdirectory(misc)
 
-# CPack configuration (NSIS on Windows)
-set(CPACK_GENERATOR "NSIS")
-set(CPACK_PACKAGE_NAME "YAMS")
-set(CPACK_PACKAGE_VENDOR "io.github.atuleu")
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Yet Another Media Server")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/atuleu/yams")
-set(CPACK_PACKAGE_INSTALL_DIRECTORY
-	"YAMS ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
-)
-set(CPACK_NSIS_DISPLAY_NAME "YAMS: Yet Another Media Server")
-set(CPACK_NSIS_PACKAGE_NAME "YAMS: Yet Another Media Server")
-set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-set(CPACK_PACKAGE_EXECUTABLES "yams" "YAMS: Yet Another Media Server")
-set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+if(WIN32)
+	add_subdirectory(src/yams_launcher)
+	# CPack configuration (NSIS on Windows)
+	set(CPACK_GENERATOR "NSIS")
+	set(CPACK_PACKAGE_NAME "YAMS")
+	set(CPACK_PACKAGE_VENDOR "io.github.atuleu")
+	set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+	set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Yet Another Media Server")
+	set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/atuleu/yams")
+	set(CPACK_PACKAGE_INSTALL_DIRECTORY
+		"YAMS ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+	)
+	set(CPACK_NSIS_DISPLAY_NAME "YAMS: Yet Another Media Server")
+	set(CPACK_NSIS_PACKAGE_NAME "YAMS: Yet Another Media Server")
+	set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+	set(CPACK_PACKAGE_EXECUTABLES "yams_launcher"
+								  "YAMS: Yet Another Media Server"
+	)
 
-set(CPACK_NSIS_MODIFY_PATH OFF)
+	set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 
-# Add "Run YAMS" checkbox on finish page
-set(CPACK_NSIS_MUI_FINISHPAGE_RUN "yams.exe")
+	set(CPACK_NSIS_MODIFY_PATH OFF)
 
-set(CPACK_NSIS_MUI_ICON
-	"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams.ico"
-)
-set(CPACK_NSIS_MUI_UNIICON
-	"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams-uninstall.ico"
-)
+	# Add "Run YAMS" checkbox on finish page
+	set(CPACK_NSIS_MUI_FINISHPAGE_RUN "yams_launcher")
 
-set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\yams.exe")
+	set(CPACK_NSIS_MUI_ICON
+		"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams.ico"
+	)
+	set(CPACK_NSIS_MUI_UNIICON
+		"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams-uninstall.ico"
+	)
 
-# Define all NSIS extra commands in one place to avoid overwriting
-set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-	"
-	CreateShortCut '$DESKTOP\\\\YAMS: Yet Another Media Server ${CPACK_PACKAGE_VERSION}.lnk' '$INSTDIR\\\\bin\\\\yams.exe'
+	set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\yams_launcher.exe")
+
+	# Define all NSIS extra commands in one place to avoid overwriting
+	set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
+		"
 	ExecWait 'msiexec /i \\\"$INSTDIR\\\\${CMAKE_INSTALL_DATADIR}\\\\gstreamer-1.0-runtime.msi\\\" /passive INSTALLDIR=\\\"$INSTDIR\\\\gstreamer\\\"'
+	CreateShortCut '$DESKTOP\\\\YAMS: Yet Another Media Server ${CPACK_PACKAGE_VERSION}.lnk' '$INSTDIR\\\\bin\\\\yams_launcher.exe'
 "
-)
+	)
 
-set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-	"
+	set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
+		"
 	Delete '$DESKTOP\\\\YAMS: Yet Another Media Server ${CPACK_PACKAGE_VERSION}.lnk'
 	ExecWait 'msiexec /x \\\"$INSTDIR\\\\${CMAKE_INSTALL_DATADIR}\\\\gstreamer-1.0-runtime.msi\\\" /passive'
 "
-)
+	)
 
-set(CPACK_PACKAGE_ICON
-	"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams.ico"
-)
+	set(CPACK_PACKAGE_ICON
+		"${PROJECT_SOURCE_DIR}\\\\resources\\\\icons\\\\yams.ico"
+	)
 
-include(CPack)
+	include(CPack)
+endif()
