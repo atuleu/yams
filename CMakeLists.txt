@@ -8,7 +8,7 @@ project(
 	LANGUAGES C CXX
 )
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 6.9 REQUIRED COMPONENTS Core Gui Widgets OpenGL)
@@ -34,6 +34,13 @@ else()
 	)
 endif()
 
+FetchContent_Declare(
+	concurrentqueue
+	GIT_REPOSITORY https://github.com/cameron314/concurrentqueue
+	GIT_TAG v1.0.4
+	GIT_SHALLOW TRUE
+)
+
 # Fetch GoogleTest framework
 FetchContent_Declare(
 	googletest
@@ -41,7 +48,6 @@ FetchContent_Declare(
 	GIT_TAG 52eb8108c5bdec04579160ae17225d66034bd723
 	GIT_SHALLOW TRUE
 )
-
 # Prevent GoogleTest from overriding compiler/linker options
 set(gtest_force_shared_crt
 	ON
@@ -65,7 +71,9 @@ FetchContent_Declare(
 	GIT_TAG 6c0cb87edd029ddfb403a8e24577c144a03605a6
 )
 
-FetchContent_MakeAvailable(slogpp googletest cmake_git_version_tracking)
+FetchContent_MakeAvailable(
+	slogpp googletest cmake_git_version_tracking concurrentqueue
+)
 
 message(STATUS "Found current version: ${GIT_DESCRIBE}")
 
@@ -74,11 +82,7 @@ enable_testing()
 
 include(GoogleTest)
 
-if(WIN32)
-	add_custom_target(check ${CMAKE_CTEST_COMMAND} ARGS --verbose)
-else()
-	add_custom_target(check ALL ${CMAKE_CTEST_COMMAND} ARGS --verbose)
-endif()
+add_custom_target(check ${CMAKE_CTEST_COMMAND} ARGS --verbose)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(

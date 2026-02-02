@@ -94,9 +94,16 @@ jobs:
             -DCMAKE_CXX_COMPILER=g++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-      - name: Build and run tests
+      - name: Build
         run: |
-          cmake --build build --parallel
+          cmake --build build --parallel --target yams yams-tests
+
+      - name: Test
+        uses: GabrielBB/xvfb-action@v1
+        with:
+          run: cmake --build build --parallel --target check
+          working-directory: ${{github.workspace}}
+
 
       - name: Upload test logs on failure
         if: failure()

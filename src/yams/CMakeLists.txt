@@ -15,7 +15,11 @@ set(SRC_HEADERS
 	VideoThread.hpp
 )
 
-set(SRC_TESTS_FILES LoggingTest.cpp)
+set(SRC_TESTS_FILES
+	utest/main.cpp #
+	LoggingTest.cpp #
+	GstThreadTest.cpp #
+)
 
 add_library(yams-common STATIC ${SRC_FILES} ${SRC_HEADERS})
 
@@ -42,7 +46,7 @@ target_link_libraries(yams PRIVATE yams-common)
 
 add_executable(yams-tests ${SRC_TESTS_FILES})
 
-target_link_libraries(yams-tests yams-common GTest::gmock_main)
+target_link_libraries(yams-tests yams-common GTest::gmock concurrentqueue)
 
 set_target_properties(
 	yams-common yams yams-tests
@@ -55,11 +59,16 @@ add_test(NAME yams-all-tests COMMAND yams-tests)
 add_dependencies(check yams-tests)
 
 if(WIN32)
+	# Your mileage may not work, especially in CI.
+	set(gstreamer_BIN_DIR "${gstreamer_LIBRARY_DIRS}/../bin")
+	cmake_path(ABSOLUTE_PATH gstreamer_BIN_DIR NORMALIZE)
 	set_tests_properties(
 		yams-all-tests
-		PROPERTIES ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>;$ENV{PATH}"
+		PROPERTIES
+			ENVIRONMENT
+			"PATH=$<TARGET_FILE_DIR:Qt6::Core>;${gstreamer_BIN_DIR};$ENV{PATH}"
 	)
-
+	message(STATUS "${gstreamer_BIN_DIR} added to test path")
 endif()
 
 install(
@@ -111,8 +120,9 @@ if(WIN32)
 		yams_deploy_script
 		CONTENT
 		"
-qt_deploy_runtime_dependencies(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)
-"
+			qt_deploy_runtime_dependencies
+			(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)
+			"
 	)
 
 	install(SCRIPT ${yams_deploy_script})

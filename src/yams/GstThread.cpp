@@ -34,13 +34,7 @@ void GstThread::run() {
 	startTask();
 #ifdef Q_OS_LINUX
 	// Runs a gmailoop on linux
-	connect(
-	    this,
-	    SIGNAL(stopRequested()),
-	    this,
-	    SLOT(quit()),
-	    Qt::QueuedConnection
-	);
+	connect(this, &GstThread::stopRequested, this, &QThread::quit);
 	exec();
 #else
 	g_main_loop_run(d_loop);

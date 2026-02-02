@@ -126,12 +126,13 @@ jobs:
             ${{ github.workspace }}/gst-runtime.msi
           key: gstreamer-1.25.90-windows-msvc2019-${{ runner.os }}-v2
 
-      - name: Adds GStreamer to PkgConfig Path
+      - name: Adds GStreamer & Qt to PkgConfig Path and Path
         shell:  powershell
         run : |
           $env:PKG_CONFIG_PATH = "C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\pkgconfig"
           echo "PKG_CONFIG_PATH=$env:PKG_CONFIG_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "C:\Program Files\gstreamer\1.0\msvc_x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "${{ github.workspace }}\Qt\6.9.3\msvc2022_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -151,9 +152,11 @@ jobs:
             -DGSTREAMER_RUNTIME_INSTALLER=gst-runtime.msi
 
       - name: Build and run tests
-        shell: cmd
+        shell: powershell
         run: |
-          cmake --build build --parallel --target check
+          cmake --build build --parallel --target yams yams-tests
+          # running through ctest is a nightmare, simply run the tests
+          ${{ github.workspace }}\build\yams-tests.exe
 
       - name: Package with CPack (NSIS)
         shell: cmd

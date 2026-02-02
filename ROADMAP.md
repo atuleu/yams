@@ -69,17 +69,16 @@ This document outlines the development phases for YAMS, with detailed task break
 
 **Tasks**:
 - [x] Add GStreamer dependency detection in CMake (Linux and Windows)
-- [ ] Initialize GStreamer in main()
-- [ ] Create simple test pipeline (playbin with test video URI)
-- [ ] Implement Qt event loop integration (QTimer polling GStreamer bus)
-- [ ] Log GStreamer messages (state changes, errors, warnings)
-- [ ] Add test: Verify GStreamer initializes without errors
-- [ ] Add test: Verify pipeline can be created and transitions to PLAYING state
+- [x] Initialize GStreamer in main()
+- [x] Create simple test pipeline (playbin with test video URI)
+- [x] Implement Qt event loop integration (GMainLoop running in dedicated thread)
+- [x] Log GStreamer messages (errors, EOS)
+- [x] Add test: Verify a main loop is running both in Linux & Windows
 - [x] **Linux CI**: Install GStreamer dev packages
 - [x] **Windows CI**: Install GStreamer MSVC runtime, cache installation
 - [x] **Windows CI**: Bundle GStreamer DLLs and plugins with executable
-- [ ] **Flatpak**: Add GStreamer to Flatpak manifest
-- [ ] Verify pipeline runs on all three artifacts (check logs)
+- [x] **Flatpak**: Add GStreamer to Flatpak manifest
+- [x] Verify pipeline runs on all three artifacts (check logs)
 
 **Deliverables**:
 - GStreamer initialization and cleanup integrated into application

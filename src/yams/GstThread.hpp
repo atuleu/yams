@@ -15,14 +15,14 @@ public:
 	GstThread &operator=(const GstThread &) = delete;
 	GstThread &operator=(GstThread &&)      = delete;
 
+	void stop();
+
 #ifdef Q_OS_LINUX
 signals:
 	void stopRequested();
 #endif
 
 protected:
-	void stop();
-
 	void         run() override;
 	virtual void startTask() = 0;
 	virtual void doneTask()  = 0;
