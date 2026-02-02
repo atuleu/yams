@@ -2,8 +2,8 @@
 
 This document outlines the development phases for YAMS, with detailed task breakdown for each phase. Each phase includes Linux and Windows testing/deployment to ensure cross-platform compatibility throughout development.
 
-**Current Phase**: Phase 0.2 (GStreamer Integration) - Starting
-**Last Updated**: 2026-01-27
+**Current Phase**: Phase 0.3 (Add OpenGL Rendering) - Starting
+**Last Updated**: 2026-02-02
 
 ---
 
@@ -88,6 +88,8 @@ This document outlines the development phases for YAMS, with detailed task break
 - All three CI artifacts updated and working with GStreamer
 
 **Phase 0.2 Complete When**: GStreamer pipeline runs successfully on Linux, Windows, and Flatpak builds.
+
+**Status**: ✅ **COMPLETE** (v0.2.0 - 2026-02-02)
 
 ---
 
@@ -866,6 +868,7 @@ Versioning scheme aligned with phases and sub-phases:
 - **v0.1.1**: Phase 0.2 complete (GStreamer Integration)
 - **v0.1.2**: Phase 0.3 complete (OpenGL Rendering)
 - **v0.1.3**: Phase 0.4 complete (Qt + GStreamer + OpenGL Integration)
+- **v0.2.0**: Phase 0.2 complete (GStreamer Integration) — RELEASED (2026-02-02)
 
 ### Phase 1: Single Layer Media Playback (v0.2.x)
 - **v0.2.0**: Phase 1.1 complete (GStreamer to OpenGL Pipeline)

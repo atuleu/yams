@@ -120,9 +120,8 @@ if(WIN32)
 		yams_deploy_script
 		CONTENT
 		"
-			qt_deploy_runtime_dependencies
-			(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)
-			"
+qt_deploy_runtime_dependencies(EXECUTABLE \"$<TARGET_FILE:yams>\" GENERATE_QT_CONF)
+"
 	)
 
 	install(SCRIPT ${yams_deploy_script})
