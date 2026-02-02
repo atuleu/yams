@@ -11,8 +11,7 @@ project(
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Qt6 (>= 6.4 for Ubuntu 22.04 compatibility)
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets OpenGL)
+find_package(Qt6 6.9 REQUIRED COMPONENTS Core Gui Widgets OpenGL)
 qt_standard_project_setup()
 set(CMAKE_AUTOMOC OFF)
 set(CMAKE_AUTOUIC OFF)
