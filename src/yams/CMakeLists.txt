@@ -1,9 +1,18 @@
-set(SRC_FILES Logging.cpp #
-			  Version.cpp
+set(SRC_FILES
+	Logging.cpp #
+	Version.cpp #
+	GstThread.cpp #
+	VideoWidget.cpp
+	VideoThread.cpp
 )
 
-set(SRC_HEADERS Logging.hpp #
-				Version.hpp
+set(SRC_HEADERS
+	Logging.hpp #
+	defer.hpp #
+	Version.hpp #
+	GstThread.hpp #
+	VideoWidget.hpp
+	VideoThread.hpp
 )
 
 set(SRC_TESTS_FILES LoggingTest.cpp)
