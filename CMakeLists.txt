@@ -139,7 +139,7 @@ if(WIN32)
 	# Define all NSIS extra commands in one place to avoid overwriting
 	set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
 		"
-	ExecWait 'msiexec /i \\\"$INSTDIR\\\\${CMAKE_INSTALL_DATADIR}\\\\gstreamer-1.0-runtime.msi\\\" /passive INSTALLDIR=\\\"$INSTDIR\\\\gstreamer\\\"'
+	ExecWait 'msiexec /i \\\"$INSTDIR\\\\${CMAKE_INSTALL_DATADIR}\\\\gstreamer-1.0-runtime.msi\\\" /passive INSTALLDIR=\\\"$INSTDIR\\\\gstreamer\\\" ADDLOCAL=ALL'
 	CreateShortCut '$DESKTOP\\\\YAMS: Yet Another Media Server ${CPACK_PACKAGE_VERSION}.lnk' '$INSTDIR\\\\bin\\\\yams_launcher.exe'
 "
 	)
