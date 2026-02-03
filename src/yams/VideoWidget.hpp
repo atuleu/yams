@@ -2,8 +2,9 @@
 
 #include <gst/gst.h>
 
+#include <QOpenGLBuffer>
+#include <QOpenGLFunctions>
 #include <QOpenGLWindow>
-#include <qopenglwindow.h>
 
 namespace yams {
 
@@ -19,7 +20,7 @@ template <typename T> struct GstBufferUnrefer {
 using GstBufferPtr = std::unique_ptr<GstBuffer, GstBufferUnrefer<GstBuffer>>;
 }; // namespace details
 
-class VideoWidget : public QOpenGLWindow {
+class VideoWidget : public QOpenGLWindow, protected QOpenGLFunctions {
 	Q_OBJECT
 public:
 	VideoWidget(QWindow *parent = nullptr);
@@ -35,5 +36,9 @@ protected:
 	void resizeGL(int w, int h) override;
 
 private:
+	void setSize(int w, int h);
+
+	QSize         d_size = {0, 0};
+	QOpenGLBuffer d_triangle;
 };
 } // namespace yams

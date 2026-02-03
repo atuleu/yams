@@ -2,12 +2,15 @@
 
 #include <QGuiApplication>
 #include <QMetaEnum>
+#include <QOpenGLFunctions>
 #include <QPainter>
 #include <QScreen>
+#include <QTimer>
 
 #include <gst/gst.h>
 
 #include <qnamespace.h>
+#include <qopenglext.h>
 #include <qsurfaceformat.h>
 
 #include <slog++/Attribute.hpp>
@@ -57,7 +60,8 @@ VideoWidget::VideoWidget(QWindow *parent)
 	if (screens.size() == 1) {
 		slog::Warn("only one screen");
 	}
-	auto target = screens[std::min(qsizetype(1), screens.size() - 1)];
+	auto target =
+	    screens[0]; // screens[std::min(qsizetype(1), screens.size() - 1)];
 
 	setFlags(Qt::Window | Qt::FramelessWindowHint);
 	setScreen(target);
@@ -66,13 +70,10 @@ VideoWidget::VideoWidget(QWindow *parent)
 	slog::Info(
 	    "target screen",
 	    slog::String("manufacturer", target->manufacturer().toStdString()),
-	    slog::String("model", target->model().toStdString()),
-	    slogQRect("geometry", target->geometry()),
-	    slogQRect("virtualGeometry", target->virtualGeometry()),
-	    slog::String("actual", screen()->model().toStdString())
+	    slog::String("model", target->model().toStdString())
 	);
 
-	auto displayFormat = [this](bool visible) {
+	auto displayFormat = [this, target](bool visible) {
 		if (visible == false) {
 			return;
 		}
@@ -90,7 +91,11 @@ VideoWidget::VideoWidget(QWindow *parent)
 
 	connect(this, &QWindow::visibleChanged, this, displayFormat);
 
-	showFullScreen();
+	// we need to show, processEvents and make fullscreen to avoid race
+	// conditions in cosmic-comp. Your Mileage may not work.
+	show();
+	QCoreApplication::processEvents();
+	QTimer::singleShot(0, this, [this]() { showFullScreen(); });
 }
 
 VideoWidget::~VideoWidget() {}
@@ -102,10 +107,49 @@ void VideoWidget::pushNewBuffer(void *buffer) {
 	update();
 }
 
-void VideoWidget::initializeGL() {}
+void VideoWidget::initializeGL() {
+	initializeOpenGLFunctions();
 
-void VideoWidget::paintGL() {}
+	slog::Info("coucou");
+	defer {
+		slog::Info("done");
+	};
+	glViewport(0, 0, d_size.width(), d_size.height());
+	d_triangle.create();
+	d_triangle.bind();
+	float vertices[] =
+	    {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f};
+	slog::Info("ok");
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	d_triangle.release();
+}
 
-void VideoWidget::resizeGL(int w, int h) {}
+void VideoWidget::paintGL() {
+	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+template <typename Str>
+slog::Attribute slogQSize(Str &&name, const QSize &size) {
+	return slog::Group(
+	    std::forward<Str>(name),
+	    slog::Int("width", size.width()),
+	    slog::Int("height", size.height())
+	);
+}
+
+void VideoWidget::resizeGL(int w, int h) {
+	auto newSize = QSize{w, h};
+	if (d_size == newSize) {
+		return;
+	}
+	d_size = newSize;
+	slog::Info(
+	    "resize",
+	    slog::Group("size", slog::Int("width", w), slog::Int("height", h))
+	);
+	glViewport(0, 0, w, h);
+	update();
+}
 
 } // namespace yams

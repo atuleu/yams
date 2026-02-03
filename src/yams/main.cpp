@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 	window.show();
 
 	videoTask.start();
-	QTimer::singleShot(4000, [&]() {
+	QTimer::singleShot(6000, [&]() {
 		slog::Info("stopping pipeline");
 		videoTask.stopPipeline();
 	});
