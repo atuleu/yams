@@ -2,7 +2,8 @@
 
 #include <gst/gst.h>
 
-#include <QWidget>
+#include <QOpenGLWindow>
+#include <qopenglwindow.h>
 
 namespace yams {
 
@@ -18,22 +19,21 @@ template <typename T> struct GstBufferUnrefer {
 using GstBufferPtr = std::unique_ptr<GstBuffer, GstBufferUnrefer<GstBuffer>>;
 }; // namespace details
 
-class VideoWidget : public QWidget {
+class VideoWidget : public QOpenGLWindow {
 	Q_OBJECT
 public:
-	VideoWidget(QWidget *parent = nullptr)
-	    : QWidget(parent) {}
-
-	virtual ~VideoWidget() = default;
+	VideoWidget(QWindow *parent = nullptr);
+	virtual ~VideoWidget();
 
 public slots:
 
 	void pushNewBuffer(void *buffer);
 
 protected:
-	void paintEvent(QPaintEvent *event) override;
+	void initializeGL() override;
+	void paintGL() override;
+	void resizeGL(int w, int h) override;
 
 private:
-	details::GstBufferPtr d_buffer = nullptr;
 };
 } // namespace yams

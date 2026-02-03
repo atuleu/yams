@@ -12,6 +12,16 @@ int main(int argc, char *argv[]) {
 	gst_init(&argc, &argv);
 	QApplication app(argc, argv);
 
+	QSurfaceFormat fmt;
+	fmt.setMajorVersion(3);
+	fmt.setMinorVersion(3);
+	fmt.setProfile(QSurfaceFormat::CoreProfile);
+	fmt.setDepthBufferSize(8);
+	fmt.setStencilBufferSize(8);
+	fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+
+	QSurfaceFormat::setDefaultFormat(fmt);
+
 	yams::VideoThread videoTask;
 
 	yams::VideoWidget window;
