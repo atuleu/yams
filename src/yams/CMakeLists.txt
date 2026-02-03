@@ -9,6 +9,8 @@ set(SRC_FILES
 set(SRC_HEADERS
 	Logging.hpp #
 	defer.hpp #
+	gstreamer.hpp #
+	slogQt.hpp #
 	Version.hpp #
 	GstThread.hpp #
 	VideoWidget.hpp
@@ -44,6 +46,8 @@ qt_add_resources(
 	FILES
 	shaders/sprite.vertex
 	shaders/sprite.fragment
+	shaders/frame.vertex
+	shaders/frame.fragment
 )
 
 if(WIN32)

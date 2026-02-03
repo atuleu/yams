@@ -7,72 +7,76 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <gst/gl/gstglsyncmeta.h>
 #include <gst/gst.h>
 
+#include <gst/gstbuffer.h>
+#include <gst/video/video-info.h>
 #include <qnamespace.h>
 #include <qopenglext.h>
 #include <qopenglshaderprogram.h>
 #include <qsurfaceformat.h>
 
-#include <slog++/Attribute.hpp>
-#include <slog++/slog++.hpp>
+#include "slogQt.hpp"
 
-#include "defer.hpp"
+#include <gst/gl/gl.h>
+#include <gst/video/video.h>
 
 namespace yams {
-template <typename Str> slog::Attribute slogQRect(Str &&name, const QRect &r) {
-	return slog::Group(
-	    std::forward<Str>(name),
-	    slog::Int("x", r.x()),
-	    slog::Int("y", r.y()),
-	    slog::Int("width", r.width()),
-	    slog::Int("height", r.height())
-	);
-}
+VideoWidget::Frame::Frame() {}
 
-template <typename Str>
-slog::Attribute slogQPoint(Str &&name, const QPoint &p) {
-	return slog::Group(
-	    std::forward<Str>(name),
-	    slog::Int("x", p.x()),
-	    slog::Int("y", p.y())
-	);
-}
+VideoWidget::Frame::Frame(GstBuffer *buffer)
+    : Buffer{buffer} {
+	if (buffer == nullptr) {
+		return;
+	}
 
-template <typename Str, typename Enum>
-slog::Attribute slogQEnum(Str &&name, Enum m) {
-	QMetaEnum me = QMetaEnum::fromType<Enum>();
-	if (me.isValid()) {
-		return slog::String(
-		    std::forward<Str>(name),
-		    me.valueToKey(static_cast<int>(m))
+	auto mem = gst_buffer_peek_memory(buffer, 0);
+	if (gst_is_gl_memory(mem) == false) {
+		throw std::runtime_error("buffer is not a GL mapped memory!");
+	}
+
+	Sync = gst_buffer_get_gl_sync_meta(buffer);
+	if (Sync == nullptr) {
+		throw std::runtime_error("buffer does not contains synchronization data"
 		);
-	} else {
-		return slog::Int(std::forward<Str>(name), static_cast<int>(m));
 	}
+
+	Memory    = reinterpret_cast<GstGLMemory *>(mem);
+	auto meta = gst_buffer_get_video_meta(buffer);
+	Size      = {int(meta->width), int(meta->height)};
+
+	GstVideoInfo infos;
+	gst_video_info_set_format(&infos, meta->format, meta->width, meta->height);
+	GstVideoFrame frame;
+	gst_video_frame_map(
+	    &frame,
+	    &infos,
+	    buffer,
+	    (GstMapFlags)(GST_MAP_READ | GST_MAP_GL)
+	);
+	TexID = *(guint *)frame.data[0];
 }
 
-VideoWidget::VideoWidget(QWindow *parent)
-    : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent) {
-
-	auto defaultFmt = QSurfaceFormat::defaultFormat();
-
-	auto screens = QGuiApplication::screens();
-	if (screens.size() == 1) {
-		slog::Warn("only one screen");
+void VideoWidget::pushNewBuffer(void *buffer) {
+	if (buffer == nullptr) {
+		return;
 	}
-	auto target = screens[std::min(qsizetype(1), screens.size() - 1)];
+	try {
+		d_frame = Frame{reinterpret_cast<GstBuffer *>(buffer)};
+	} catch (std::exception &e) {
+		slog::Error("could not use buffer", slog::String("error", e.what()));
+	}
+	update();
+}
+
+VideoWidget::VideoWidget(QScreen *target, QWindow *parent)
+    : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent) {
 
 	setCursor(QCursor{Qt::BlankCursor});
 	setFlags(Qt::Window | Qt::FramelessWindowHint);
 	setScreen(target);
 	setGeometry(target->geometry());
-
-	slog::Info(
-	    "target screen",
-	    slog::String("manufacturer", target->manufacturer().toStdString()),
-	    slog::String("model", target->model().toStdString())
-	);
 
 	auto displayFormat = [this, target](bool visible) {
 		if (visible == false) {
@@ -83,8 +87,8 @@ VideoWidget::VideoWidget(QWindow *parent)
 		    "windows format",
 		    slog::Int("major", actualFormat.majorVersion()),
 		    slog::Int("minor", actualFormat.majorVersion()),
-		    slogQEnum("profile", actualFormat.profile()),
-		    slogQEnum("swapBehavior", actualFormat.swapBehavior()),
+		    slog::QEnum("profile", actualFormat.profile()),
+		    slog::QEnum("swapBehavior", actualFormat.swapBehavior()),
 		    slog::Int("depthBufferSize", actualFormat.depthBufferSize()),
 		    slog::Int("stencilBufferSize", actualFormat.stencilBufferSize())
 		);
@@ -102,79 +106,117 @@ VideoWidget::VideoWidget(QWindow *parent)
 
 VideoWidget::~VideoWidget() {}
 
-void VideoWidget::pushNewBuffer(void *buffer) {
-	auto buffer_ = reinterpret_cast<GstBuffer *>(buffer);
-	// discard it for now.
-	gst_buffer_unref(buffer_);
-	update();
-}
-
 void VideoWidget::initializeGL() {
 	initializeOpenGLFunctions();
 
+	glEnable(GL_TEXTURE_2D);
+
 	glViewport(0, 0, d_size.width(), d_size.height());
-	d_triangleVBO.create();
-	d_triangleVAO.create();
-	d_triangleVAO.bind();
-	d_triangleVBO.bind();
-	// clang-format off
-	float vertices[] = {
-		// positions         // colors
-		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
-		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
-		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top
-	};
-	// clang-format on
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(
-	    0,
-	    3,
-	    GL_FLOAT,
-	    GL_FALSE,
-	    6 * sizeof(float),
-	    (void *)0
-	);
-	glEnableVertexAttribArray(0);
-
-	glVertexAttribPointer(
-	    1,
-	    3,
-	    GL_FLOAT,
-	    GL_FALSE,
-	    6 * sizeof(float),
-	    (void *)(3 * sizeof(float))
-	);
-	glEnableVertexAttribArray(1);
-
-	d_triangleVBO.release();
-	d_triangleVAO.release();
 
 	d_shader.addShaderFromSourceFile(
 	    QOpenGLShader::Vertex,
-	    ":shaders/sprite.vertex"
+	    ":shaders/frame.vertex"
 	);
 	d_shader.addShaderFromSourceFile(
 	    QOpenGLShader::Fragment,
-	    ":shaders/sprite.fragment"
+	    ":shaders/frame.fragment"
 	);
 	d_shader.link();
+
+	d_frameVAO.create();
+	d_frameVBO.create();
+	d_frameVAO.bind();
+	d_frameVBO.bind();
+	float frameVertices[24] = {
+	    -1.0f, -1.0f, 0.0f, 0.0f, //
+	    +1.0f, -1.0f, 1.0f, 0.0f, //
+	    +1.0f, +1.0f, 1.0f, 1.0f, //
+	    +1.0f, +1.0f, 1.0f, 1.0f, //
+	    -1.0f, 1.0f,  0.0f, 1.0f, //
+	    -1.0f, -1.0f, 0.0f, 0.0f, //
+	};
+	glBufferData(
+	    GL_ARRAY_BUFFER,
+	    sizeof(frameVertices),
+	    frameVertices,
+	    GL_STATIC_DRAW
+	);
+	glVertexAttribPointer(
+	    0,
+	    2,
+	    GL_FLOAT,
+	    GL_FALSE,
+	    4 * sizeof(float),
+	    (void *)(0 * sizeof(float))
+	);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(
+	    1,
+	    2,
+	    GL_FLOAT,
+	    GL_FALSE,
+	    4 * sizeof(float),
+	    (void *)(2 * sizeof(float))
+	);
+	glEnableVertexAttribArray(1);
+	d_frameVBO.release();
+	d_frameVAO.release();
+
+	QSize  textureSize = {1680, 720};
+	QImage frame{textureSize, QImage::Format_RGB888};
+	frame.fill(Qt::cyan);
+
+	d_placeholder = new QOpenGLTexture(frame);
+	d_frame.Size  = textureSize;
+}
+
+VideoWidget::Matrix3f VideoWidget::computeProjection(const QSize &size) const {
+	auto  ratio = float(d_size.height()) / float(size.height());
+	float width = size.width() * ratio;
+	if (width <= d_size.width()) {
+		// viewport with full height
+		// clang-format off
+		return Matrix3f{
+		    .data = {
+				1.0f/ratio, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f,
+		        0.0f, 0.0f, 0.0f
+			},
+		};
+		// clang-format on
+	} else {
+		ratio = float(d_size.width()) / float(size.width());
+		// viewport with full width
+		// clang-format off
+		return Matrix3f{
+		    .data = {
+				1.0f, 0.0f, 0.0f,
+				0.0f, 1.0f/ratio, 0.0f,
+		        0.0f, 0.0f, 0.0f
+			},
+		};
+		// clang-format on
+	}
 }
 
 void VideoWidget::paintGL() {
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-	d_shader.bind();
-	d_triangleVAO.bind();
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-}
 
-template <typename Str>
-slog::Attribute slogQSize(Str &&name, const QSize &size) {
-	return slog::Group(
-	    std::forward<Str>(name),
-	    slog::Int("width", size.width()),
-	    slog::Int("height", size.height())
-	);
+	d_shader.bind();
+
+	auto loc = d_shader.uniformLocation("scaleMat");
+	glUniformMatrix3fv(loc, 1, GL_FALSE, computeProjection(d_frame.Size).data);
+
+	glActiveTexture(GL_TEXTURE0);
+	if (d_frame.Buffer != nullptr) {
+		gst_gl_sync_meta_wait(d_frame.Sync, d_frame.Memory->mem.context);
+		glBindTexture(GL_TEXTURE_2D, d_frame.TexID);
+	} else {
+		d_placeholder->bind();
+	}
+	d_frameVAO.bind();
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 void VideoWidget::resizeGL(int w, int h) {

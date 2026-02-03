@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QObject>
+#include <QScreen>
 #include <QTimer>
 
 #include "VideoThread.hpp"
@@ -23,7 +24,18 @@ int main(int argc, char *argv[]) {
 
 	yams::VideoThread videoTask;
 
-	yams::VideoWidget window;
+	auto screens = QGuiApplication::screens();
+	if (screens.size() == 1) {
+		slog::Warn("only one screen");
+	}
+	auto target = screens[std::min(qsizetype(1), screens.size() - 1)];
+	slog::Info(
+	    "target screen",
+	    slog::String("manufacturer", target->manufacturer().toStdString()),
+	    slog::String("model", target->model().toStdString())
+	);
+
+	yams::VideoWidget window{target};
 	window.resize(1920, 1090);
 	QObject::connect(
 	    &videoTask,

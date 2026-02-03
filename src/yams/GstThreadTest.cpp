@@ -9,7 +9,6 @@
 #include <qcoreapplication.h>
 #include <qnamespace.h>
 #include <qtypes.h>
-#include <thread>
 
 namespace yams {
 class MockThread : public GstThread {

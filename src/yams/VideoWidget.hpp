@@ -1,32 +1,25 @@
 #pragma once
 
-#include <gst/gst.h>
+#include "yams/gstreamer.hpp"
 
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
+#include <QOpenGLTexture>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWindow>
-#include <qopenglvertexarrayobject.h>
+#include <gst/gl/gstgl_fwd.h>
+#include <qopengltexture.h>
+
+typedef struct _GstGLMemory   GstGLMemory;
+typedef struct _GstGLSyncMeta GstGLSyncMeta;
 
 namespace yams {
-
-namespace details {
-template <typename T> struct GstBufferUnrefer {
-	void operator()(T *obj) const noexcept {
-		if (obj != nullptr) {
-			gst_buffer_unref(obj);
-		}
-	}
-};
-
-using GstBufferPtr = std::unique_ptr<GstBuffer, GstBufferUnrefer<GstBuffer>>;
-}; // namespace details
 
 class VideoWidget : public QOpenGLWindow, protected QOpenGLFunctions {
 	Q_OBJECT
 public:
-	VideoWidget(QWindow *parent = nullptr);
+	VideoWidget(QScreen *target, QWindow *parent = nullptr);
 	virtual ~VideoWidget();
 
 public slots:
@@ -41,9 +34,28 @@ protected:
 private:
 	void setSize(int w, int h);
 
+	struct Frame {
+		GstBufferPtr   Buffer = nullptr;
+		QSize          Size;
+		guint          TexID  = 0;
+		GstGLSyncMeta *Sync   = nullptr;
+		GstGLMemory   *Memory = nullptr;
+
+		Frame();
+		Frame(GstBuffer *buffer);
+	};
+
+	struct Matrix3f {
+		float data[9];
+	};
+
+	Matrix3f computeProjection(const QSize &size) const;
+
 	QSize                    d_size = {0, 0};
-	QOpenGLVertexArrayObject d_triangleVAO;
-	QOpenGLBuffer            d_triangleVBO;
+	QOpenGLVertexArrayObject d_frameVAO;
+	QOpenGLBuffer            d_frameVBO;
 	QOpenGLShaderProgram     d_shader;
+	Frame                    d_frame;
+	QOpenGLTexture          *d_placeholder = nullptr;
 };
 } // namespace yams
