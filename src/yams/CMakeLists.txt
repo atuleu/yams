@@ -36,6 +36,16 @@ target_link_libraries(
 		   PkgConfig::gstreamer
 )
 
+qt_add_resources(
+	yams-common
+	"shaders"
+	PREFIX
+	"/"
+	FILES
+	shaders/sprite.vertex
+	shaders/sprite.fragment
+)
+
 if(WIN32)
 	configure_file(yams.rc.in yams.rc @ONLY)
 endif()

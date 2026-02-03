@@ -4,7 +4,10 @@
 
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLVertexArrayObject>
 #include <QOpenGLWindow>
+#include <qopenglvertexarrayobject.h>
 
 namespace yams {
 
@@ -38,7 +41,9 @@ protected:
 private:
 	void setSize(int w, int h);
 
-	QSize         d_size = {0, 0};
-	QOpenGLBuffer d_triangle;
+	QSize                    d_size = {0, 0};
+	QOpenGLVertexArrayObject d_triangleVAO;
+	QOpenGLBuffer            d_triangleVBO;
+	QOpenGLShaderProgram     d_shader;
 };
 } // namespace yams

@@ -11,6 +11,7 @@
 
 #include <qnamespace.h>
 #include <qopenglext.h>
+#include <qopenglshaderprogram.h>
 #include <qsurfaceformat.h>
 
 #include <slog++/Attribute.hpp>
@@ -60,9 +61,9 @@ VideoWidget::VideoWidget(QWindow *parent)
 	if (screens.size() == 1) {
 		slog::Warn("only one screen");
 	}
-	auto target =
-	    screens[0]; // screens[std::min(qsizetype(1), screens.size() - 1)];
+	auto target = screens[std::min(qsizetype(1), screens.size() - 1)];
 
+	setCursor(QCursor{Qt::BlankCursor});
 	setFlags(Qt::Window | Qt::FramelessWindowHint);
 	setScreen(target);
 	setGeometry(target->geometry());
@@ -94,6 +95,7 @@ VideoWidget::VideoWidget(QWindow *parent)
 	// we need to show, processEvents and make fullscreen to avoid race
 	// conditions in cosmic-comp. Your Mileage may not work.
 	show();
+
 	QCoreApplication::processEvents();
 	QTimer::singleShot(0, this, [this]() { showFullScreen(); });
 }
@@ -110,23 +112,60 @@ void VideoWidget::pushNewBuffer(void *buffer) {
 void VideoWidget::initializeGL() {
 	initializeOpenGLFunctions();
 
-	slog::Info("coucou");
-	defer {
-		slog::Info("done");
-	};
 	glViewport(0, 0, d_size.width(), d_size.height());
-	d_triangle.create();
-	d_triangle.bind();
-	float vertices[] =
-	    {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f};
-	slog::Info("ok");
+	d_triangleVBO.create();
+	d_triangleVAO.create();
+	d_triangleVAO.bind();
+	d_triangleVBO.bind();
+	// clang-format off
+	float vertices[] = {
+		// positions         // colors
+		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
+		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top
+	};
+	// clang-format on
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	d_triangle.release();
+	glVertexAttribPointer(
+	    0,
+	    3,
+	    GL_FLOAT,
+	    GL_FALSE,
+	    6 * sizeof(float),
+	    (void *)0
+	);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(
+	    1,
+	    3,
+	    GL_FLOAT,
+	    GL_FALSE,
+	    6 * sizeof(float),
+	    (void *)(3 * sizeof(float))
+	);
+	glEnableVertexAttribArray(1);
+
+	d_triangleVBO.release();
+	d_triangleVAO.release();
+
+	d_shader.addShaderFromSourceFile(
+	    QOpenGLShader::Vertex,
+	    ":shaders/sprite.vertex"
+	);
+	d_shader.addShaderFromSourceFile(
+	    QOpenGLShader::Fragment,
+	    ":shaders/sprite.fragment"
+	);
+	d_shader.link();
 }
 
 void VideoWidget::paintGL() {
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
+	d_shader.bind();
+	d_triangleVAO.bind();
+	glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
 template <typename Str>

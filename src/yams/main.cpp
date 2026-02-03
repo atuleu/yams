@@ -19,7 +19,6 @@ int main(int argc, char *argv[]) {
 	fmt.setDepthBufferSize(8);
 	fmt.setStencilBufferSize(8);
 	fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-
 	QSurfaceFormat::setDefaultFormat(fmt);
 
 	yams::VideoThread videoTask;
