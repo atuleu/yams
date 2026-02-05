@@ -2,6 +2,7 @@ set(SRC_FILES
 	Logging.cpp #
 	Version.cpp #
 	GstThread.cpp #
+	gstQOpenGL.cpp #
 	VideoWidget.cpp
 	VideoThread.cpp
 )
@@ -10,6 +11,7 @@ set(SRC_HEADERS
 	Logging.hpp #
 	defer.hpp #
 	gstreamer.hpp #
+	gstQOpenGL.hpp #
 	slogQt.hpp #
 	Version.hpp #
 	GstThread.hpp #

@@ -8,10 +8,11 @@
 #include <QOpenGLTexture>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWindow>
-#include <gst/gl/gstgl_fwd.h>
-#include <qopengltexture.h>
 
-typedef struct _GstGLMemory   GstGLMemory;
+#include <gst/gl/gstgl_fwd.h>
+
+#include <tuple>
+
 typedef struct _GstGLSyncMeta GstGLSyncMeta;
 
 namespace yams {
@@ -21,6 +22,8 @@ class VideoWidget : public QOpenGLWindow, protected QOpenGLFunctions {
 public:
 	VideoWidget(QScreen *target, QWindow *parent = nullptr);
 	virtual ~VideoWidget();
+
+	std::tuple<GstGLDisplay *, GstGLContext *> wrappedContext() const;
 
 public slots:
 
@@ -57,5 +60,8 @@ private:
 	QOpenGLShaderProgram     d_shader;
 	Frame                    d_frame;
 	QOpenGLTexture          *d_placeholder = nullptr;
+	std::atomic<bool>        d_initialized = false;
+	GstGLDisplayPtr          d_display;
+	GstGLContextPtr          d_context;
 };
 } // namespace yams

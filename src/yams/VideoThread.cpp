@@ -1,25 +1,39 @@
 #include "VideoThread.hpp"
 
+#include <glib.h>
+#include <gst/gl/gstgl_fwd.h>
+#include <gst/gl/gstglapi.h>
+#include <gst/gl/gstglcontext.h>
+#include <gst/gl/gstgldisplay.h>
+#include <gst/gstbus.h>
+#include <gst/gstcontext.h>
 #include <gst/gstelement.h>
+#include <gst/gstmessage.h>
+#include <qopenglcontext.h>
+#include <qtpreprocessorsupport.h>
 #include <slog++/slog++.hpp>
 
 #include "defer.hpp"
+#include "yams/gstreamer.hpp"
+
+#include <QGuiApplication>
 
 namespace yams {
 
-VideoThread::VideoThread(QObject *parent)
-    : yams::GstThread{parent} {
-	d_pipeline       = details::GstElementPtr{gst_pipeline_new("redraw")};
-	auto source      = gst_element_factory_make("videotestsrc", "source0");
-	auto convert     = gst_element_factory_make("videoconvert", "convert0");
-	auto capsConvert = gst_element_factory_make("capsfilter", "caps0");
-	auto sink        = gst_element_factory_make("fakesink", "sink0");
-	if (!d_pipeline || !source || !convert || !capsConvert || !sink) {
+VideoThread::VideoThread(
+    GstGLDisplay *display, GstGLContext *context, QObject *parent
+)
+    : yams::GstThread{parent}
+    , d_display{display}
+    , d_context{context} {
+	d_pipeline    = GstElementPtr{gst_pipeline_new("redraw")};
+	auto source   = gst_element_factory_make("videotestsrc", "source0");
+	auto convert  = gst_element_factory_make("videoconvert", "convert0");
+	auto glUpload = gst_element_factory_make("glupload", "glupload0");
+	auto sink     = gst_element_factory_make("fakesink", "sink0");
+	if (!d_pipeline || !source || !convert || !glUpload || !sink) {
 		slog::Fatal("could not create element");
 	}
-	auto caps =
-	    gst_caps_from_string("video/x-raw,format=BGR,width=1920,height=1080");
-	g_object_set(G_OBJECT(capsConvert), "caps", caps, nullptr);
 
 	g_object_set(
 	    G_OBJECT(sink),
@@ -41,23 +55,29 @@ VideoThread::VideoThread(QObject *parent)
 	    GST_BIN(d_pipeline.get()),
 	    source,
 	    convert,
-	    capsConvert,
+	    glUpload,
 	    sink,
 	    nullptr
 	);
-	if (gst_element_link_many(source, convert, capsConvert, sink, nullptr) ==
+	if (gst_element_link_many(source, convert, glUpload, sink, nullptr) ==
 	    false) {
 		slog::Fatal("could not link elements");
 	}
 
-	auto bus =
-	    details::GstBusPtr{gst_pipeline_get_bus(GST_PIPELINE(d_pipeline.get()))
-	    };
+	auto bus = GstBusPtr{gst_pipeline_get_bus(GST_PIPELINE(d_pipeline.get()))};
 
 	gst_bus_add_watch(bus.get(), &VideoThread::onNewMessageCb, this);
+	gst_bus_enable_sync_message_emission(bus.get());
+	g_signal_connect(
+	    bus.get(),
+	    "sync-message",
+	    G_CALLBACK(&VideoThread::onSyncMessageCb),
+	    this
+	);
 }
 
 void VideoThread::startTask() {
+	gst_element_set_state(d_pipeline.get(), GST_STATE_PAUSED);
 	gst_element_set_state(d_pipeline.get(), GST_STATE_PLAYING);
 }
 
@@ -71,12 +91,12 @@ void VideoThread::onNewFrame(GstBuffer *buffer) {
 }
 
 void VideoThread::onNewFrameCb(
-    GstElement *fakesink, GstBuffer *buffer, GstPad *pad, gpointer userdata
+    GstElement *fakesink, GstBuffer *buffer, GstPad *pad, VideoThread *self
 ) {
-	auto self = reinterpret_cast<VideoThread *>(userdata);
-	if (!buffer || !self) {
-		return;
-	};
+	Q_UNUSED(pad);
+	Q_UNUSED(fakesink);
+	// we ref the buffer.
+
 	self->onNewFrame(buffer);
 }
 
@@ -101,8 +121,8 @@ VideoThread::onNewMessageCb(GstBus *bus, GstMessage *msg, gpointer userdata) {
 		};
 		slog::Error(
 		    "bus error",
-		    slog::String("source", msg->src->name),
-		    slog::String("error", err->message),
+		    slog::String("source", (const char *)msg->src->name),
+		    slog::String("error", (const char *)err->message),
 		    slog::String("debug", debug != nullptr ? debug : "none")
 		);
 		self->stop();
@@ -112,6 +132,40 @@ VideoThread::onNewMessageCb(GstBus *bus, GstMessage *msg, gpointer userdata) {
 		break;
 	}
 	return TRUE;
+}
+
+gboolean
+VideoThread::onSyncMessageCb(GstBus *bus, GstMessage *msg, VideoThread *self) {
+	if (GST_MESSAGE_TYPE(msg) != GST_MESSAGE_NEED_CONTEXT) {
+		return false;
+	}
+	const gchar *contextType;
+	gst_message_parse_context_type(msg, &contextType);
+	slog::Info("Gstreamer need context", slog::String("type", contextType));
+	if (g_strcmp0(contextType, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
+		GstContext *displayContext =
+		    gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
+		gst_context_set_gl_display(displayContext, self->d_display);
+		gst_element_set_context(GST_ELEMENT(msg->src), displayContext);
+	} else if (g_strcmp0(contextType, "gst.gl.app_context") == 0) {
+		slog::Info(
+		    "GL things",
+		    slog::Pointer("display", self->d_display),
+		    slog::Pointer("context", self->d_context)
+		);
+		GstContext   *appContext = gst_context_new("gst.gl.app_context", TRUE);
+		GstStructure *s          = gst_context_writable_structure(appContext);
+		gst_structure_set(
+		    s,
+		    "context",
+		    GST_TYPE_GL_CONTEXT,
+		    self->d_context,
+		    nullptr
+		);
+		gst_element_set_context(GST_ELEMENT(msg->src), appContext);
+	}
+
+	return false;
 }
 
 void VideoThread::stopPipeline() {

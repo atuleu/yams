@@ -7,19 +7,17 @@
 #include <QScreen>
 #include <QTimer>
 
-#include <gst/gl/gstglsyncmeta.h>
+#include <glib.h>
+#include <gst/gl/gl.h>
+#include <gst/gl/gstglcontext.h>
 #include <gst/gst.h>
-
 #include <gst/gstbuffer.h>
 #include <gst/video/video-info.h>
-#include <qnamespace.h>
-#include <qopenglext.h>
-#include <qopenglshaderprogram.h>
-#include <qsurfaceformat.h>
 
 #include "slogQt.hpp"
+#include "yams/gstQOpenGL.hpp"
+#include "yams/gstreamer.hpp"
 
-#include <gst/gl/gl.h>
 #include <gst/video/video.h>
 
 namespace yams {
@@ -97,9 +95,8 @@ VideoWidget::VideoWidget(QScreen *target, QWindow *parent)
 	connect(this, &QWindow::visibleChanged, this, displayFormat);
 
 	// we need to show, processEvents and make fullscreen to avoid race
-	// conditions in cosmic-comp. Your Mileage may not work.
+	// conditions in cosmic-comp. Your Mileage May Vary.
 	show();
-
 	QCoreApplication::processEvents();
 	QTimer::singleShot(0, this, [this]() { showFullScreen(); });
 }
@@ -108,6 +105,24 @@ VideoWidget::~VideoWidget() {}
 
 void VideoWidget::initializeGL() {
 	initializeOpenGLFunctions();
+
+	d_display = fromGuiApplication();
+	d_context = wrapQOpenGLContext(d_display.get(), context());
+
+	gst_gl_context_activate(d_context.get(), TRUE);
+	GError *error{nullptr};
+	if (gst_gl_context_fill_info(d_context.get(), &error) == false ||
+	    error != nullptr) {
+		slog::Fatal(
+		    "could not fill info",
+		    slog::String("error", error != nullptr ? error->message : "unknown")
+		);
+		if (error != nullptr) {
+			g_error_free(error);
+		}
+	}
+	d_initialized.store(true);
+	d_initialized.notify_all();
 
 	glEnable(GL_TEXTURE_2D);
 
@@ -233,4 +248,8 @@ void VideoWidget::resizeGL(int w, int h) {
 	update();
 }
 
+std::tuple<GstGLDisplay *, GstGLContext *> VideoWidget::wrappedContext() const {
+	d_initialized.wait(false);
+	return {d_display.get(), d_context.get()};
+}
 } // namespace yams

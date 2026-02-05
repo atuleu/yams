@@ -22,8 +22,6 @@ int main(int argc, char *argv[]) {
 	fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
 	QSurfaceFormat::setDefaultFormat(fmt);
 
-	yams::VideoThread videoTask;
-
 	auto screens = QGuiApplication::screens();
 	if (screens.size() == 1) {
 		slog::Warn("only one screen");
@@ -36,14 +34,18 @@ int main(int argc, char *argv[]) {
 	);
 
 	yams::VideoWidget window{target};
-	window.resize(1920, 1090);
-	QObject::connect(
-	    &videoTask,
-	    SIGNAL(newFrame(void *)),
-	    &window,
-	    SLOT(pushNewBuffer(void *)),
-	    Qt::QueuedConnection
-	);
+
+	auto [display, context] = window.wrappedContext();
+
+	yams::VideoThread videoTask{display, context};
+
+	// QObject::connect(
+	//     &videoTask,
+	//     SIGNAL(newFrame(void *)),
+	//     &window,
+	//     SLOT(pushNewBuffer(void *)),
+	//     Qt::QueuedConnection
+	// );
 
 	QObject::connect(&videoTask, SIGNAL(finished()), &window, SLOT(close()));
 
