@@ -12,6 +12,7 @@
 #include <gst/gl/gstglcontext.h>
 #include <gst/gst.h>
 #include <gst/gstbuffer.h>
+#include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
 
 #include "slogQt.hpp"
@@ -23,45 +24,29 @@
 namespace yams {
 VideoWidget::Frame::Frame() {}
 
-VideoWidget::Frame::Frame(GstBuffer *buffer)
-    : Buffer{buffer} {
-	if (buffer == nullptr) {
+VideoWidget::Frame::Frame(GstVideoFrame *frame, QSize size)
+    : VideoFrame{frame}
+    , Size{size} {
+	if (frame == nullptr || frame->buffer == nullptr) {
 		return;
 	}
 
-	auto mem = gst_buffer_peek_memory(buffer, 0);
-	if (gst_is_gl_memory(mem) == false) {
-		throw std::runtime_error("buffer is not a GL mapped memory!");
-	}
-
-	Sync = gst_buffer_get_gl_sync_meta(buffer);
+	Sync = gst_buffer_get_gl_sync_meta(frame->buffer);
 	if (Sync == nullptr) {
-		throw std::runtime_error("buffer does not contains synchronization data"
-		);
+		throw std::runtime_error{"buffer does not contains synchronization data"
+		};
 	}
 
-	Memory    = reinterpret_cast<GstGLMemory *>(mem);
-	auto meta = gst_buffer_get_video_meta(buffer);
-	Size      = {int(meta->width), int(meta->height)};
-
-	GstVideoInfo infos;
-	gst_video_info_set_format(&infos, meta->format, meta->width, meta->height);
-	GstVideoFrame frame;
-	gst_video_frame_map(
-	    &frame,
-	    &infos,
-	    buffer,
-	    (GstMapFlags)(GST_MAP_READ | GST_MAP_GL)
-	);
-	TexID = *(guint *)frame.data[0];
+	TexID = *(guint *)frame->data[0];
 }
 
-void VideoWidget::pushNewBuffer(void *buffer) {
-	if (buffer == nullptr) {
+void VideoWidget::pushNewFrame(quintptr frame_, QSize size) {
+	auto frame = reinterpret_cast<GstVideoFrame *>(frame_);
+	if (frame == nullptr) {
 		return;
 	}
 	try {
-		d_frame = Frame{reinterpret_cast<GstBuffer *>(buffer)};
+		d_frame = Frame{frame, size};
 	} catch (std::exception &e) {
 		slog::Error("could not use buffer", slog::String("error", e.what()));
 	}
@@ -177,7 +162,7 @@ void VideoWidget::initializeGL() {
 	d_frameVBO.release();
 	d_frameVAO.release();
 
-	QSize  textureSize = {1680, 720};
+	QSize  textureSize = {320, 240};
 	QImage frame{textureSize, QImage::Format_RGB888};
 	frame.fill(Qt::cyan);
 
@@ -189,24 +174,27 @@ VideoWidget::Matrix3f VideoWidget::computeProjection(const QSize &size) const {
 	auto  ratio = float(d_size.height()) / float(size.height());
 	float width = size.width() * ratio;
 	if (width <= d_size.width()) {
+		ratio = float(width) / float(d_size.width());
 		// viewport with full height
 		// clang-format off
 		return Matrix3f{
 		    .data = {
-				1.0f/ratio, 0.0f, 0.0f,
-				0.0f, 1.0f, 0.0f,
+				ratio, 0.0f, 0.0f,
+				0.0f, -1.0f, 0.0f,
 		        0.0f, 0.0f, 0.0f
 			},
 		};
 		// clang-format on
 	} else {
-		ratio = float(d_size.width()) / float(size.width());
+		float height =
+		    size.height() * float(d_size.width()) / float(size.width());
+		ratio = float(height) / float(d_size.height());
 		// viewport with full width
 		// clang-format off
 		return Matrix3f{
 		    .data = {
 				1.0f, 0.0f, 0.0f,
-				0.0f, 1.0f/ratio, 0.0f,
+				0.0f, -ratio, 0.0f,
 		        0.0f, 0.0f, 0.0f
 			},
 		};
@@ -224,8 +212,8 @@ void VideoWidget::paintGL() {
 	glUniformMatrix3fv(loc, 1, GL_FALSE, computeProjection(d_frame.Size).data);
 
 	glActiveTexture(GL_TEXTURE0);
-	if (d_frame.Buffer != nullptr) {
-		gst_gl_sync_meta_wait(d_frame.Sync, d_frame.Memory->mem.context);
+	if (d_frame.VideoFrame != nullptr) {
+		gst_gl_sync_meta_wait(d_frame.Sync, d_context.get());
 		glBindTexture(GL_TEXTURE_2D, d_frame.TexID);
 	} else {
 		d_placeholder->bind();

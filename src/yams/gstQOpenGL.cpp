@@ -22,6 +22,7 @@
 
 namespace yams {
 GstGLDisplayPtr fromGuiApplication() {
+#ifdef Q_OS_LINUX
 	auto instance = static_cast<QGuiApplication *>(QGuiApplication::instance());
 	if (QGuiApplication::platformName() == "wayland") {
 		auto native =
@@ -55,6 +56,9 @@ GstGLDisplayPtr fromGuiApplication() {
 		    ))
 		};
 	}
+#else
+	return GstGLDisplayPtr{gst_gl_display_new()};
+#endif
 }
 
 GstGLContextPtr
@@ -86,10 +90,16 @@ wrapQOpenGLContext(GstGLDisplay *display, QOpenGLContext *context) {
 		    GST_GL_API_OPENGL3
 		)};
 	}
-#elif Q_OS_WIN32
+#endif
+#ifdef Q_OS_WIN32
+	auto native = context->nativeInterface<QNativeInterface::QWGLContext>();
+	if (native == nullptr) {
+		return nullptr;
+	}
+
 	return GstGLContextPtr{gst_gl_context_new_wrapped(
 	    display,
-	    wglGetCurrentContext(),
+	    (guintptr)native->nativeContext(),
 	    GST_GL_PLATFORM_WGL,
 	    GST_GL_API_OPENGL3
 	)};

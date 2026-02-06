@@ -3,7 +3,7 @@
 #include "yams/GstThread.hpp"
 
 #include <QObject>
-#include <gst/gl/gstgl_fwd.h>
+#include <QSize>
 
 #include "yams/gstreamer.hpp"
 
@@ -24,9 +24,9 @@ protected:
 	void doneTask() override;
 	void onNewFrame(GstBuffer *buffer);
 
-	static void onNewFrameCb(
-	    GstElement *fakesink, GstBuffer *buffer, GstPad *pad, VideoThread *self
-	);
+	GstFlowReturn onNewSample(GstElement *appsink);
+
+	static GstFlowReturn onNewSampleCb(GstElement *appsink, VideoThread *self);
 
 	static gboolean
 	onNewMessageCb(GstBus *bus, GstMessage *msg, gpointer userdata);
@@ -35,12 +35,14 @@ protected:
 	onSyncMessageCb(GstBus *bus, GstMessage *buffer, VideoThread *userdata);
 
 signals:
-	void newFrame(void *buffer);
+	void newFrame(quintptr frame, QSize size);
 
 private:
-	GstElementPtr d_pipeline;
-	GstGLDisplay *d_display;
-	GstGLContext *d_context;
+	GstElementPtr               d_pipeline;
+	GstGLDisplay               *d_display;
+	GstGLContext               *d_context;
+	GstGLContextPtr             d_gstContext{nullptr};
+	std::optional<GstVideoInfo> d_infos;
 };
 
 } // namespace yams

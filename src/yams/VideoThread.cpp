@@ -1,20 +1,29 @@
 #include "VideoThread.hpp"
 
+#include <glib-object.h>
 #include <glib.h>
 #include <gst/gl/gstgl_fwd.h>
 #include <gst/gl/gstglapi.h>
 #include <gst/gl/gstglcontext.h>
 #include <gst/gl/gstgldisplay.h>
+#include <gst/gl/gstglmemory.h>
+#include <gst/gl/gstglsyncmeta.h>
+#include <gst/gstbuffer.h>
 #include <gst/gstbus.h>
 #include <gst/gstcontext.h>
 #include <gst/gstelement.h>
+#include <gst/gstmemory.h>
 #include <gst/gstmessage.h>
+#include <gst/gstpad.h>
+#include <gst/gstsample.h>
+#include <gst/video/video-info.h>
 #include <qopenglcontext.h>
 #include <qtpreprocessorsupport.h>
 #include <slog++/slog++.hpp>
 
 #include "defer.hpp"
 #include "yams/gstreamer.hpp"
+#include "yams/slogQt.hpp"
 
 #include <QGuiApplication>
 
@@ -30,24 +39,17 @@ VideoThread::VideoThread(
 	auto source   = gst_element_factory_make("videotestsrc", "source0");
 	auto convert  = gst_element_factory_make("videoconvert", "convert0");
 	auto glUpload = gst_element_factory_make("glupload", "glupload0");
-	auto sink     = gst_element_factory_make("fakesink", "sink0");
+	auto sink     = gst_element_factory_make("appsink", "sink0");
 	if (!d_pipeline || !source || !convert || !glUpload || !sink) {
 		slog::Fatal("could not create element");
 	}
 
-	g_object_set(
-	    G_OBJECT(sink),
-	    "signal-handoffs",
-	    TRUE,
-	    "sync",
-	    TRUE,
-	    nullptr
-	);
+	g_object_set(G_OBJECT(sink), "emit-signals", TRUE, "sync", TRUE, nullptr);
 
 	g_signal_connect(
 	    sink,
-	    "handoff",
-	    G_CALLBACK(VideoThread::onNewFrameCb),
+	    "new-sample",
+	    G_CALLBACK(VideoThread::onNewSampleCb),
 	    this
 	);
 
@@ -85,19 +87,74 @@ void VideoThread::doneTask() {
 	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
 }
 
-void VideoThread::onNewFrame(GstBuffer *buffer) {
-	gst_buffer_ref(buffer);
-	emit newFrame(buffer);
+GstFlowReturn
+VideoThread::onNewSampleCb(GstElement *appsink, VideoThread *self) {
+	return self->onNewSample(appsink);
 }
 
-void VideoThread::onNewFrameCb(
-    GstElement *fakesink, GstBuffer *buffer, GstPad *pad, VideoThread *self
-) {
-	Q_UNUSED(pad);
-	Q_UNUSED(fakesink);
-	// we ref the buffer.
+GstFlowReturn VideoThread::onNewSample(GstElement *appsink) {
+	GstSample *sample{nullptr};
+	g_signal_emit_by_name(appsink, "pull-sample", &sample, nullptr);
 
-	self->onNewFrame(buffer);
+	if (sample == nullptr) {
+		return GST_FLOW_FLUSHING;
+	}
+
+	auto buffer = gst_buffer_ref(gst_sample_get_buffer(sample));
+	gst_sample_unref(sample);
+
+	if (d_gstContext == nullptr) {
+		auto mem = gst_buffer_peek_memory(buffer, 0);
+		d_gstContext.reset(reinterpret_cast<GstGLBaseMemory *>(mem)->context);
+		gst_object_ref(d_gstContext.get());
+	}
+
+	if (d_infos.has_value() == false) {
+		d_infos   = GstVideoInfo{};
+		auto meta = gst_buffer_get_video_meta(buffer);
+		gst_video_info_set_format(
+		    &d_infos.value(),
+		    meta->format,
+		    meta->width,
+		    meta->height
+		);
+		auto i = d_infos.value();
+		slog::Info(
+		    "format",
+		    slog::Group(
+		        "infos",
+		        slog::Int("width", i.width),
+		        slog::Int("height", i.height)
+		    )
+		);
+	}
+
+	auto syncMeta = gst_buffer_get_gl_sync_meta(buffer);
+	if (syncMeta == nullptr) {
+		buffer   = gst_buffer_make_writable(buffer);
+		syncMeta = gst_buffer_add_gl_sync_meta(d_gstContext.get(), buffer);
+	}
+	gst_gl_sync_meta_set_sync_point(syncMeta, d_gstContext.get());
+
+	auto frame = g_new0(GstVideoFrame, 1);
+	if (gst_video_frame_map(
+	        frame,
+	        &d_infos.value(),
+	        buffer,
+	        GstMapFlags(GST_MAP_READ | GST_MAP_GL)
+	    ) == false) {
+		slog::Warn("failed to map video buffer");
+		gst_buffer_unref(buffer);
+		return GST_FLOW_ERROR;
+	}
+	gst_buffer_unref(buffer); // frame holds a ref from here
+
+	emit newFrame(
+	    (quintptr)frame,
+	    QSize{d_infos.value().width, d_infos.value().height}
+	);
+
+	return GST_FLOW_OK;
 }
 
 gboolean

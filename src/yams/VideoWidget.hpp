@@ -27,7 +27,7 @@ public:
 
 public slots:
 
-	void pushNewBuffer(void *buffer);
+	void pushNewFrame(quintptr frame, QSize size);
 
 protected:
 	void initializeGL() override;
@@ -38,14 +38,13 @@ private:
 	void setSize(int w, int h);
 
 	struct Frame {
-		GstBufferPtr   Buffer = nullptr;
-		QSize          Size;
-		guint          TexID  = 0;
-		GstGLSyncMeta *Sync   = nullptr;
-		GstGLMemory   *Memory = nullptr;
+		GstVideoFramePtr VideoFrame = nullptr;
+		QSize            Size;
+		guint            TexID = 0;
+		GstGLSyncMeta   *Sync  = nullptr;
 
 		Frame();
-		Frame(GstBuffer *buffer);
+		Frame(GstVideoFrame *frame, QSize size);
 	};
 
 	struct Matrix3f {

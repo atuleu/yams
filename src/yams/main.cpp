@@ -39,13 +39,13 @@ int main(int argc, char *argv[]) {
 
 	yams::VideoThread videoTask{display, context};
 
-	// QObject::connect(
-	//     &videoTask,
-	//     SIGNAL(newFrame(void *)),
-	//     &window,
-	//     SLOT(pushNewBuffer(void *)),
-	//     Qt::QueuedConnection
-	// );
+	QObject::connect(
+	    &videoTask,
+	    &yams::VideoThread::newFrame,
+	    &window,
+	    &yams::VideoWidget::pushNewFrame,
+	    Qt::QueuedConnection
+	);
 
 	QObject::connect(&videoTask, SIGNAL(finished()), &window, SLOT(close()));
 
