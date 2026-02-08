@@ -1,6 +1,6 @@
 #pragma once
 
-#include "yams/gstreamer.hpp"
+#include <yams/gstreamer/memory.hpp>
 
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>

@@ -1,4 +1,4 @@
-#include "yams/Logging.hpp"
+#include <yams/utils/Logging.hpp>
 
 #include <cstdlib>
 

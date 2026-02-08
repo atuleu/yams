@@ -3,6 +3,7 @@
 #include <gst/gl/gstgl_fwd.h>
 #include <gst/gst.h>
 
+#include <gst/gstobject.h>
 #include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
 #include <memory>
@@ -25,6 +26,7 @@ template <typename T> struct GstVideoFrameUnmapper {
 			return;
 		}
 		gst_video_frame_unmap(obj);
+		gst_object_unref(obj);
 	}
 };
 

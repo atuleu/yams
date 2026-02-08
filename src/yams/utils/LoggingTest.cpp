@@ -12,7 +12,7 @@
 #include <slog++/MockSink.hpp>
 #include <slog++/slog++.hpp>
 
-#include "Logging.hpp"
+#include <yams/utils/Logging.hpp>
 
 // Custom printers for Google Mock/Test
 // These functions are discovered via ADL (Argument Dependent Lookup) and allow

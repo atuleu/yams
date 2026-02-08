@@ -1,19 +1,19 @@
 set(SRC_FILES
-	Logging.cpp #
-	Version.cpp #
+	utils/Logging.cpp #
+	utils/Version.cpp #
 	GstThread.cpp #
-	gstQOpenGL.cpp #
+	gstreamer/QOpenGL.cpp #
 	VideoWidget.cpp
 	VideoThread.cpp
 )
 
 set(SRC_HEADERS
-	Logging.hpp #
-	defer.hpp #
-	gstreamer.hpp #
-	gstQOpenGL.hpp #
-	slogQt.hpp #
-	Version.hpp #
+	utils/Logging.hpp #
+	utils/defer.hpp #
+	utils/slogQt.hpp #
+	utils/Version.hpp #
+	gstreamer/memory.hpp #
+	gstreamer/QOpenGL.hpp #
 	GstThread.hpp #
 	VideoWidget.hpp
 	VideoThread.hpp
@@ -21,7 +21,8 @@ set(SRC_HEADERS
 
 set(SRC_TESTS_FILES
 	utest/main.cpp #
-	LoggingTest.cpp #
+	gstreamer/memoryTest.cpp #
+	utils/LoggingTest.cpp #
 	GstThreadTest.cpp #
 )
 

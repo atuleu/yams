@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QSize>
 
-#include "yams/gstreamer.hpp"
+#include <yams/gstreamer/memory.hpp>
 
 namespace yams {
 namespace details {} // namespace details

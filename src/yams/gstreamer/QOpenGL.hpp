@@ -1,7 +1,6 @@
 #pragma once
 
-#include "gstreamer.hpp"
-
+#include <yams/gstreamer/memory.hpp>
 class QOpenGLContext;
 
 namespace yams {

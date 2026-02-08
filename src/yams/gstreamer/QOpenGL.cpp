@@ -1,9 +1,9 @@
-#include "gstQOpenGL.hpp"
+#include <yams/gstreamer/QOpenGL.hpp>
 
 #include <QGuiApplication>
 #include <QOpenGLContext>
 
-#include "slogQt.hpp"
+#include <yams/utils/slogQt.hpp>
 
 #include <gst/gl/gl.h>
 #include <gst/gstobject.h>
