@@ -3,6 +3,8 @@ set(SRC_FILES
 	utils/Version.cpp #
 	gstreamer/Thread.cpp #
 	gstreamer/QOpenGL.cpp #
+	gstreamer/Pipeline.cpp
+	Compositor.cpp
 	VideoWidget.cpp
 	VideoThread.cpp
 )
@@ -12,16 +14,18 @@ set(SRC_HEADERS
 	utils/defer.hpp #
 	utils/slogQt.hpp #
 	utils/Version.hpp #
-	gstreamer/memory.hpp #
+	gstreamer/Memory.hpp #
 	gstreamer/QOpenGL.hpp #
 	gstreamer/Thread.hpp #
+	gstreamer/Pipeline.hpp
+	Compositor.hpp
 	VideoWidget.hpp
 	VideoThread.hpp
 )
 
 set(SRC_TESTS_FILES
 	utest/main.cpp #
-	gstreamer/memoryTest.cpp #
+	gstreamer/MemoryTest.cpp #
 	utils/LoggingTest.cpp #
 	gstreamer/ThreadTest.cpp #
 )
@@ -39,6 +43,7 @@ target_link_libraries(
 		   slog++::slog++
 		   cmake_git_version_tracking
 		   PkgConfig::gstreamer
+		   cpptrace::cpptrace
 )
 
 qt_add_resources(

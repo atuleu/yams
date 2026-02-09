@@ -1,11 +1,10 @@
 #pragma once
 
-#include <yams/gstreamer/Thread.hpp>
-
 #include <QObject>
 #include <QSize>
 
-#include <yams/gstreamer/memory.hpp>
+#include <yams/gstreamer/Memory.hpp>
+#include <yams/gstreamer/Thread.hpp>
 
 namespace yams {
 namespace details {} // namespace details

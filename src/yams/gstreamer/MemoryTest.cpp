@@ -1,7 +1,7 @@
 #include <gst/gstelement.h>
 #include <gtest/gtest.h>
 
-#include "memory.hpp"
+#include "Memory.hpp"
 
 namespace yams {
 static_assert(

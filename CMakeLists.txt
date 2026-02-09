@@ -71,8 +71,15 @@ FetchContent_Declare(
 	GIT_TAG 6c0cb87edd029ddfb403a8e24577c144a03605a6
 )
 
+include(FetchContent)
+FetchContent_Declare(
+	cpptrace
+	GIT_REPOSITORY https://github.com/jeremy-rifkin/cpptrace.git
+	GIT_TAG v1.0.4 # <HASH or TAG>
+)
+
 FetchContent_MakeAvailable(
-	slogpp googletest cmake_git_version_tracking concurrentqueue
+	slogpp googletest cmake_git_version_tracking concurrentqueue cpptrace
 )
 
 message(STATUS "Found current version: ${GIT_DESCRIBE}")

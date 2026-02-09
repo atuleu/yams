@@ -21,7 +21,7 @@
 #include <qtpreprocessorsupport.h>
 #include <slog++/slog++.hpp>
 
-#include <yams/gstreamer/memory.hpp>
+#include <yams/gstreamer/Memory.hpp>
 #include <yams/utils/defer.hpp>
 #include <yams/utils/slogQt.hpp>
 

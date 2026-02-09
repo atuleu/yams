@@ -15,8 +15,8 @@
 #include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
 
+#include <yams/gstreamer/Memory.hpp>
 #include <yams/gstreamer/QOpenGL.hpp>
-#include <yams/gstreamer/memory.hpp>
 #include <yams/utils/slogQt.hpp>
 
 #include <gst/video/video.h>

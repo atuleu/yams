@@ -7,7 +7,7 @@
 
 #include <QSocketNotifier>
 
-#include <yams/gstreamer/memory.hpp>
+#include <yams/gstreamer/Memory.hpp>
 
 namespace yams {
 
