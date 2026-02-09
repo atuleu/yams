@@ -13,6 +13,8 @@ set(ICONS_RESOLUTIONS
 	256
 )
 
+set_directory_properties(PROPERTIES CLEAN_NO_CUSTOM 1)
+
 set(ICONS_OUTPUTS "")
 foreach(i ${ICONS_SVG_FILES})
 	string(REPLACE ".svg" "" base ${i})
