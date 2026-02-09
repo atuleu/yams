@@ -149,7 +149,12 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Debug,
 	    "debug is hooked",
-	    slog::Int("line", 155),
+#ifndef NDEBUG
+	    slog::Int("line", 160),
+#else
+	    slog::String("file", ""),
+	    slog::Int("line", 0),
+#endif
 	    slog::String("qt_category", "default")
 	);
 	qDebug() << "debug is hooked";
@@ -157,7 +162,12 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Info,
 	    "info is hooked",
-	    slog::Int("line", 163),
+#ifndef NDEBUG
+	    slog::Int("line", 173),
+#else
+	    slog::String("file", ""),
+	    slog::Int("line", 0),
+#endif
 	    slog::String("qt_category", "default")
 	);
 	qInfo() << "info is hooked";
@@ -165,7 +175,12 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Warn,
 	    "warning is hooked",
-	    slog::Int("line", 171),
+#ifndef NDEBUG
+	    slog::Int("line", 186),
+#else
+	    slog::String("file", ""),
+	    slog::Int("line", 0),
+#endif
 	    slog::String("qt_category", "default")
 	);
 	qWarning() << "warning is hooked";
@@ -173,7 +188,12 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Error,
 	    "critical is hooked",
-	    slog::Int("line", 179),
+#ifndef NDEBUG
+	    slog::Int("line", 199),
+#else
+	    slog::String("file", ""),
+	    slog::Int("line", 0),
+#endif
 	    slog::String("qt_category", "default")
 	);
 	qCritical() << "critical is hooked";

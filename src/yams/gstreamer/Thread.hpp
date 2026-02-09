@@ -2,9 +2,36 @@
 
 #include <QThread>
 
+#include <glib.h>
 #include <gst/gst.h>
 
+#include <QSocketNotifier>
+
+#include <yams/gstreamer/memory.hpp>
+
 namespace yams {
+
+namespace details {
+class BusWatcher;
+}
+
+class GstThread : public QThread {
+	Q_OBJECT
+public:
+	GstThread(QObject *parent = nullptr);
+	virtual ~GstThread();
+	GstThread(const GstThread &)            = delete;
+	GstThread(GstThread &&)                 = delete;
+	GstThread &operator=(const GstThread &) = delete;
+	GstThread &operator=(GstThread &&)      = delete;
+
+	void watchBus(GstBus *bus, GstBusFunc callback, gpointer userdata);
+	void unwatchBus(GstBus *bus);
+
+private:
+	std::map<GstBus *, std::unique_ptr<details::BusWatcher>> d_buses;
+};
+
 class GstThreadLegacy : public QThread {
 	Q_OBJECT
 public:
