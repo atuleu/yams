@@ -26,6 +26,7 @@ set(SRC_HEADERS
 set(SRC_TESTS_FILES
 	utest/main.cpp #
 	gstreamer/MemoryTest.cpp #
+	gstreamer/PipelineTest.cpp #
 	utils/LoggingTest.cpp #
 	gstreamer/ThreadTest.cpp #
 )

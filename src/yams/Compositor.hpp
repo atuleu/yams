@@ -6,8 +6,8 @@
 #include <QObject>
 #include <QSize>
 
-#include <complex>
 #include <gst/gl/gstgl_fwd.h>
+#include <gst/gstbus.h>
 #include <gst/gstpad.h>
 #include <qobject.h>
 #include <slog++/Logger.hpp>
@@ -49,7 +49,6 @@ public:
 	struct Args {
 		GstGLDisplay *Display;
 		GstGLContext *Context;
-		GstThread    *Thread;
 		QObject      *Parent;
 	};
 
@@ -63,12 +62,10 @@ signals:
 	void videoInfos(GstVideoInfo infos);
 
 protected:
-	void onMessage(GstMessage *msg) override;
+	void            onMessage(GstMessage *msg) noexcept override;
+	GstBusSyncReply onSyncMessage(GstMessage *msg) noexcept override;
 
 private:
-	static gboolean
-	onSyncMessageCb(GstBus *bus, GstMessage *buffer, Compositor *compositor);
-
 	static GstFlowReturn onNewSampleCb(GstElement *appsink, Compositor *self);
 
 	slog::Logger<1> d_logger;

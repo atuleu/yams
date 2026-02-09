@@ -11,6 +11,7 @@
 #include <gst/gl/gstgldisplay.h>
 #include <gst/gl/gstglsyncmeta.h>
 #include <gst/gstbin.h>
+#include <gst/gstbus.h>
 #include <gst/gstcaps.h>
 #include <gst/gstelement.h>
 #include <gst/gstmessage.h>
@@ -35,7 +36,7 @@ GstElementPtr GstElementFactoryMake(const char *factory, const char *name) {
 }
 
 Compositor::Compositor(Options options, Args args)
-    : Pipeline{"compositor0", args.Thread, args.Parent}
+    : Pipeline{"compositor0", args.Parent}
     , d_logger{slog::With(slog::String(
           "pipeline", (const char *)GST_OBJECT_NAME(d_pipeline.get())
       ))} {
@@ -135,19 +136,11 @@ Compositor::Compositor(Options options, Args args)
 	    ) == false) {
 		throw cpptrace::runtime_error{"could not link pipeline elements"};
 	}
-
-	gst_bus_enable_sync_message_emission(d_bus.get());
-	g_signal_connect(
-	    d_bus.get(),
-	    "sync-message",
-	    G_CALLBACK(&Compositor::onSyncMessageCb),
-	    this
-	);
 }
 
 void Compositor::start(MediaPlayInfo media, int layer) {}
 
-void Compositor::onMessage(GstMessage *msg) {
+void Compositor::onMessage(GstMessage *msg) noexcept {
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
 		d_logger.Info("EOS", slog::String("src", (const char *)msg->src->name));
@@ -180,14 +173,13 @@ void Compositor::onMessage(GstMessage *msg) {
 	}
 }
 
-gboolean
-Compositor::onSyncMessageCb(GstBus *bus, GstMessage *msg, Compositor *self) {
+GstBusSyncReply Compositor::onSyncMessage(GstMessage *msg) noexcept {
 	if (GST_MESSAGE_TYPE(msg) != GST_MESSAGE_NEED_CONTEXT) {
-		return false;
+		return GST_BUS_PASS;
 	}
 	const gchar *contextType;
 	gst_message_parse_context_type(msg, &contextType);
-	self->d_logger.Info(
+	d_logger.Info(
 	    "Gstreamer need context",
 	    slog::String("type", contextType),
 	    slog::String("source", msg->src->name)
@@ -195,13 +187,13 @@ Compositor::onSyncMessageCb(GstBus *bus, GstMessage *msg, Compositor *self) {
 	if (g_strcmp0(contextType, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
 		GstContext *displayContext =
 		    gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
-		gst_context_set_gl_display(displayContext, self->d_display);
+		gst_context_set_gl_display(displayContext, d_display);
 		gst_element_set_context(GST_ELEMENT(msg->src), displayContext);
 	} else if (g_strcmp0(contextType, "gst.gl.app_context") == 0) {
-		self->d_logger.Debug(
+		d_logger.Debug(
 		    "GstGL Objects",
-		    slog::Pointer("display", self->d_display),
-		    slog::Pointer("context", self->d_context)
+		    slog::Pointer("display", d_display),
+		    slog::Pointer("context", d_context)
 		);
 		GstContext   *appContext = gst_context_new("gst.gl.app_context", TRUE);
 		GstStructure *s          = gst_context_writable_structure(appContext);
@@ -209,13 +201,13 @@ Compositor::onSyncMessageCb(GstBus *bus, GstMessage *msg, Compositor *self) {
 		    s,
 		    "context",
 		    GST_TYPE_GL_CONTEXT,
-		    self->d_context,
+		    d_context,
 		    nullptr
 		);
 		gst_element_set_context(GST_ELEMENT(msg->src), appContext);
 	}
 
-	return false;
+	return GST_BUS_PASS;
 }
 
 GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {

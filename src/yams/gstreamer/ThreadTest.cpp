@@ -17,70 +17,6 @@
 #include <slog++/slog++.hpp>
 
 namespace yams {
-class GstThreadTest : public testing::Test {
-protected:
-	GstThread *thread;
-	GstBusPtr  bus;
-
-	void SetUp() override {
-		thread = new GstThread{nullptr};
-		thread->start();
-		bus = GstBusPtr{gst_bus_new()};
-	}
-
-	void TearDown() override {
-		thread->quit();
-		thread->wait();
-		delete thread;
-		bus.reset();
-	}
-};
-
-struct CallerData {
-	QThread          *caller{nullptr};
-	std::atomic<bool> set{false};
-
-	void fromCurrent() {
-		caller = QThread::currentThread();
-
-		slog::Debug("caller", slog::Pointer("address", caller));
-		set.store(true);
-		set.notify_all();
-	}
-
-	void wait() {
-		set.wait(false);
-	};
-};
-
-static gboolean
-getCallerMessage(GstBus *bus, GstMessage *msg, gpointer userdata) {
-	auto callerData = reinterpret_cast<CallerData *>(userdata);
-	callerData->fromCurrent();
-	return false;
-}
-
-TEST_F(GstThreadTest, MessageRunInTheThread) {
-	using namespace std::chrono_literals;
-	CallerData callerData;
-	thread->watchBus(bus.get(), getCallerMessage, &callerData);
-	auto structure = gst_structure_new_empty("utest");
-	auto message =
-	    gst_message_new_application(GST_OBJECT_CAST(bus.get()), structure);
-	gst_bus_post(bus.get(), message);
-
-	auto future = std::make_unique<std::future<void>>(
-	    std::async(std::launch::async, [&]() { callerData.wait(); })
-	);
-	if (future->wait_for(2s) == std::future_status::timeout) {
-
-		ADD_FAILURE() << "Timeouted";
-		future.release(); // intentional memory leak on failure.
-		return;
-	}
-
-	EXPECT_EQ(callerData.caller, thread);
-}
 
 class MockThread : public GstThreadLegacy {
 public:
@@ -131,7 +67,7 @@ TEST_F(GstThreadLegacyTest, RunGLibSourceInRightThread) {
 	);
 	if (future->wait_for(2s) == std::future_status::timeout) {
 		ADD_FAILURE() << "Timeouted";
-		future.reset(); // intentional leak;
+		future.release(); // intentional leak;
 	} else {
 		EXPECT_STREQ(threadName.load(), "glibThread");
 	}
