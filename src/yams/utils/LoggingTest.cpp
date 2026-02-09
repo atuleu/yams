@@ -1,3 +1,4 @@
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <gmock/gmock.h>
 
@@ -34,6 +35,17 @@ void PrintTo(const Record *record, std::ostream *os) {
 		return;
 	}
 	PrintTo(*record, os);
+}
+
+template <typename T, typename... Attributes>
+auto ContainsAttributes(Attributes &&...attributes) {
+	using ::testing::IsSupersetOf;
+	std::initializer_list<Attribute> attrs = {
+	    static_cast<Attribute>(attributes)...,
+	};
+	return VariantWith<T>(
+	    Pointee(Field("attributes", &Record::attributes, IsSupersetOf(attrs)))
+	);
 }
 
 /// Print a slog::Sink::RecordVariant to an ostream
@@ -115,7 +127,7 @@ protected:
 		        slog::HasLevel<const slog::Record *>(level),
 		        slog::HasMessage<const slog::Record *>(std::forward<Str>(message
 		        )),
-		        slog::HasAttributes<const slog::Record *>(
+		        slog::ContainsAttributes<const slog::Record *>(
 		            std::forward<Attrs>(attrs)...
 		        )
 		    ))
@@ -137,8 +149,7 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Debug,
 	    "debug is hooked",
-	    slog::String("file", ""),
-	    slog::Int("line", 0),
+	    slog::Int("line", 155),
 	    slog::String("qt_category", "default")
 	);
 	qDebug() << "debug is hooked";
@@ -146,8 +157,7 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Info,
 	    "info is hooked",
-	    slog::String("file", ""),
-	    slog::Int("line", 0),
+	    slog::Int("line", 163),
 	    slog::String("qt_category", "default")
 	);
 	qInfo() << "info is hooked";
@@ -155,8 +165,7 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Warn,
 	    "warning is hooked",
-	    slog::String("file", ""),
-	    slog::Int("line", 0),
+	    slog::Int("line", 171),
 	    slog::String("qt_category", "default")
 	);
 	qWarning() << "warning is hooked";
@@ -164,8 +173,7 @@ TEST_F(LoggingTest, QtLoggingIsHooked) {
 	ExpectLog(
 	    slog::Level::Error,
 	    "critical is hooked",
-	    slog::String("file", ""),
-	    slog::Int("line", 0),
+	    slog::Int("line", 179),
 	    slog::String("qt_category", "default")
 	);
 	qCritical() << "critical is hooked";

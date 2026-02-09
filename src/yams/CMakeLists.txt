@@ -1,7 +1,7 @@
 set(SRC_FILES
 	utils/Logging.cpp #
 	utils/Version.cpp #
-	GstThread.cpp #
+	gstreamer/Thread.cpp #
 	gstreamer/QOpenGL.cpp #
 	VideoWidget.cpp
 	VideoThread.cpp
@@ -14,7 +14,7 @@ set(SRC_HEADERS
 	utils/Version.hpp #
 	gstreamer/memory.hpp #
 	gstreamer/QOpenGL.hpp #
-	GstThread.hpp #
+	gstreamer/Thread.hpp #
 	VideoWidget.hpp
 	VideoThread.hpp
 )
@@ -23,7 +23,7 @@ set(SRC_TESTS_FILES
 	utest/main.cpp #
 	gstreamer/memoryTest.cpp #
 	utils/LoggingTest.cpp #
-	GstThreadTest.cpp #
+	gstreamer/ThreadTest.cpp #
 )
 
 add_library(yams-common STATIC ${SRC_FILES} ${SRC_HEADERS})

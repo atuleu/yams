@@ -1,4 +1,4 @@
-#include "GstThread.hpp"
+#include "Thread.hpp"
 
 #include <QApplication>
 #include <future>
@@ -11,7 +11,7 @@
 #include <qtypes.h>
 
 namespace yams {
-class MockThread : public GstThread {
+class MockThread : public GstThreadLegacy {
 public:
 	MOCK_METHOD(void, startTask, (), (override));
 	MOCK_METHOD(void, doneTask, (), (override));

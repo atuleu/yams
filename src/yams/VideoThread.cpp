@@ -32,7 +32,7 @@ namespace yams {
 VideoThread::VideoThread(
     GstGLDisplay *display, GstGLContext *context, QObject *parent
 )
-    : yams::GstThread{parent}
+    : yams::GstThreadLegacy{parent}
     , d_display{display}
     , d_context{context} {
 	d_pipeline    = GstElementPtr{gst_pipeline_new("redraw")};

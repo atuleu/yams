@@ -5,15 +5,15 @@
 #include <gst/gst.h>
 
 namespace yams {
-class GstThread : public QThread {
+class GstThreadLegacy : public QThread {
 	Q_OBJECT
 public:
-	GstThread(QObject *parent = nullptr);
-	virtual ~GstThread();
-	GstThread(const GstThread &)            = delete;
-	GstThread(GstThread &&)                 = delete;
-	GstThread &operator=(const GstThread &) = delete;
-	GstThread &operator=(GstThread &&)      = delete;
+	GstThreadLegacy(QObject *parent = nullptr);
+	virtual ~GstThreadLegacy();
+	GstThreadLegacy(const GstThreadLegacy &)            = delete;
+	GstThreadLegacy(GstThreadLegacy &&)                 = delete;
+	GstThreadLegacy &operator=(const GstThreadLegacy &) = delete;
+	GstThreadLegacy &operator=(GstThreadLegacy &&)      = delete;
 
 	void stop();
 

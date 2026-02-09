@@ -1,6 +1,6 @@
 #pragma once
 
-#include "yams/GstThread.hpp"
+#include <yams/gstreamer/Thread.hpp>
 
 #include <QObject>
 #include <QSize>
@@ -10,7 +10,7 @@
 namespace yams {
 namespace details {} // namespace details
 
-class VideoThread : public GstThread {
+class VideoThread : public GstThreadLegacy {
 	Q_OBJECT
 public:
 	VideoThread(
