@@ -5,6 +5,7 @@
 #include <cpptrace/exceptions.hpp>
 
 #include <glib-object.h>
+#include <glib.h>
 #include <gst/app/gstappsink.h>
 #include <gst/gl/gstglbasememory.h>
 #include <gst/gl/gstglcontext.h>
@@ -18,6 +19,10 @@
 #include <gst/gstobject.h>
 #include <gst/gstutils.h>
 
+#include <gst/video/video-frame.h>
+#include <mutex>
+#include <qobject.h>
+#include <qtypes.h>
 #include <yams/gstreamer/Thread.hpp>
 #include <yams/utils/defer.hpp>
 
@@ -35,11 +40,18 @@ GstElementPtr GstElementFactoryMake(const char *factory, const char *name) {
 	return GstElementPtr{res};
 }
 
+Compositor::FramePool::Ptr Compositor::s_pool;
+std::once_flag             initialized;
+
 Compositor::Compositor(Options options, Args args)
     : Pipeline{"compositor0", args.Parent}
     , d_logger{slog::With(slog::String(
           "pipeline", (const char *)GST_OBJECT_NAME(d_pipeline.get())
       ))} {
+
+	std::call_once(initialized, []() {
+		s_pool = Compositor::FramePool::Create();
+	});
 
 	d_blacksrc = GstElementFactoryMake("videotestsrc", "blacksrc0");
 	auto blackSourceCapsfilter =
@@ -137,6 +149,8 @@ Compositor::Compositor(Options options, Args args)
 		throw cpptrace::runtime_error{"could not link pipeline elements"};
 	}
 }
+
+Compositor::~Compositor() {}
 
 void Compositor::start(MediaPlayInfo media, int layer) {}
 
@@ -258,10 +272,27 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 	// we mark that we are done with this texture from the Gstreamer context.
 	gst_gl_sync_meta_set_sync_point(syncMeta, self->d_gstContext.get());
 
-	// TODO: Use an object pool to avoid allocations?
-	auto frame = g_new0(GstVideoFrame, 1);
-	if (gst_video_frame_map(
-	        frame,
+	auto frame = Frame::Ptr{s_pool->Get([](Frame *frame) { frame->unmap(); })};
+	auto allocated = s_pool->PoolSize();
+	if (allocated < 10) {
+		self->d_logger.DDebug(
+		    "GstVideoFrame allocation",
+		    slog::Int("allocated", allocated)
+		);
+	} else if (allocated < 20) {
+		self->d_logger.Warn(
+		    "GstVideoFrame allocation",
+		    slog::Int("allocated", allocated)
+		);
+	} else {
+		self->d_logger.Error(
+		    "Large GstVideoFrame allocation, maybe missing a connection to "
+		    "Compositor::release slot?",
+		    slog::Int("allocated", allocated)
+		);
+	}
+
+	if (frame->map(
 	        &self->d_infos.value(),
 	        buffer,
 	        GstMapFlags(GST_MAP_READ | GST_MAP_GL)
@@ -272,9 +303,9 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 	}
 	gst_buffer_unref(buffer); // frame holds a ref from here
 
-	emit self->newFrame((quintptr)frame);
+	emit self->newFrame(frame);
 
 	return GST_FLOW_OK;
 }
 
-}; // namespace yams
+} // namespace yams

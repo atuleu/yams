@@ -1,6 +1,5 @@
 #pragma once
 
-#include "yams/gstreamer/Memory.hpp"
 #include <chrono>
 
 #include <QObject>
@@ -8,10 +7,15 @@
 
 #include <gst/gl/gstgl_fwd.h>
 #include <gst/gstbus.h>
+#include <gst/gstmemory.h>
 #include <gst/gstpad.h>
-#include <qobject.h>
+
 #include <slog++/Logger.hpp>
+
+#include "Frame.hpp"
+#include <yams/gstreamer/Memory.hpp>
 #include <yams/gstreamer/Pipeline.hpp>
+#include <yams/utils/ObjectPool.hpp>
 
 namespace yams {
 
@@ -27,6 +31,7 @@ struct MediaPlayInfo {
 	std::chrono::nanoseconds Fade{0};
 	bool                     Loop{false};
 };
+
 } // namespace yams
 
 Q_DECLARE_METATYPE(yams::MediaPlayInfo);
@@ -53,12 +58,12 @@ public:
 	};
 
 	Compositor(Options options, Args args);
+	virtual ~Compositor();
 
 public slots:
 	void start(MediaPlayInfo media, int layer);
-
 signals:
-	void newFrame(quintptr frame);
+	void newFrame(Frame::Ptr frame);
 	void videoInfos(GstVideoInfo infos);
 
 protected:
@@ -76,5 +81,9 @@ private:
 	std::optional<GstVideoInfo> d_infos;
 
 	GstElementPtr d_blacksrc, d_compositor;
+
+	using FramePool = ObjectPool<Frame>;
+	static FramePool::Ptr s_pool;
 };
+
 } // namespace yams

@@ -1,9 +1,11 @@
 set(SRC_FILES
 	utils/Logging.cpp #
 	utils/Version.cpp #
+	utils/ObjectPool.cpp #
 	gstreamer/Thread.cpp #
 	gstreamer/QOpenGL.cpp #
 	gstreamer/Pipeline.cpp
+	Frame.cpp
 	Compositor.cpp
 	VideoWidget.cpp
 	VideoThread.cpp
@@ -14,10 +16,12 @@ set(SRC_HEADERS
 	utils/defer.hpp #
 	utils/slogQt.hpp #
 	utils/Version.hpp #
+	utils/ObjectPool.hpp #
 	gstreamer/Memory.hpp #
 	gstreamer/QOpenGL.hpp #
 	gstreamer/Thread.hpp #
 	gstreamer/Pipeline.hpp
+	Frame.hpp
 	Compositor.hpp
 	VideoWidget.hpp
 	VideoThread.hpp
@@ -28,6 +32,7 @@ set(SRC_TESTS_FILES
 	gstreamer/MemoryTest.cpp #
 	gstreamer/PipelineTest.cpp #
 	utils/LoggingTest.cpp #
+	utils/ObjectPoolTest.cpp #
 	gstreamer/ThreadTest.cpp #
 )
 
@@ -45,6 +50,7 @@ target_link_libraries(
 		   cmake_git_version_tracking
 		   PkgConfig::gstreamer
 		   cpptrace::cpptrace
+		   concurrentqueue
 )
 
 qt_add_resources(
