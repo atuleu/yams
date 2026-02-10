@@ -100,6 +100,7 @@ pkg_check_modules(
 	gio-2.0
 	gobject-2.0
 	gstreamer-1.0
+	gstreamer-base-1.0
 	gstreamer-app-1.0
 	gstreamer-video-1.0
 	gstreamer-gl-1.0

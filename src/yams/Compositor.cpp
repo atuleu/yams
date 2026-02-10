@@ -14,15 +14,15 @@
 #include <gst/gstbin.h>
 #include <gst/gstbus.h>
 #include <gst/gstcaps.h>
+#include <gst/gstcapsfeatures.h>
 #include <gst/gstelement.h>
 #include <gst/gstmessage.h>
 #include <gst/gstobject.h>
 #include <gst/gstutils.h>
+#include <gst/gstvalue.h>
 
-#include <gst/video/video-frame.h>
 #include <mutex>
-#include <qobject.h>
-#include <qtypes.h>
+
 #include <yams/gstreamer/Thread.hpp>
 #include <yams/utils/defer.hpp>
 
@@ -43,8 +43,14 @@ GstElementPtr GstElementFactoryMake(const char *factory, const char *name) {
 Compositor::FramePool::Ptr Compositor::s_pool;
 std::once_flag             initialized;
 
+void Compositor::stop() {
+	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
+}
+
 Compositor::Compositor(Options options, Args args)
     : Pipeline{"compositor0", args.Parent}
+    , d_display{args.Display}
+    , d_context{args.Context}
     , d_logger{slog::With(slog::String(
           "pipeline", (const char *)GST_OBJECT_NAME(d_pipeline.get())
       ))} {
@@ -60,27 +66,33 @@ Compositor::Compositor(Options options, Args args)
 	auto compositorCapsfilter = GstElementFactoryMake("capsfilter", "vmixcaps");
 	auto appsink              = GstElementFactoryMake("appsink", "sink0");
 
+	// clang-format off
 	auto blacksourceCaps = gst_caps_new_simple(
 	    "video/x-raw",
-	    "framerate",
-	    "1/1",
-	    "width",
-	    16,
-	    "height",
-	    16,
+	    "framerate", GST_TYPE_FRACTION, 1, 1,
+	    "width", G_TYPE_INT, 16,
+	    "height", G_TYPE_INT, 16,
 	    nullptr
 	);
 
 	auto compositorCaps = gst_caps_new_simple(
 	    "video/x-raw",
-	    "framerate",
-	    (std::to_string(options.FPS) + "/1").c_str(),
-	    "width",
-	    options.Size.width(),
-	    "height",
-	    options.Size.height(),
+	    "framerate",GST_TYPE_FRACTION, options.FPS, 1,
+		"width", G_TYPE_INT, options.Size.width(),
+	    "height", G_TYPE_INT, options.Size.height(),
 	    nullptr
 	);
+	// clang-format on
+	if (blacksourceCaps == nullptr) {
+		throw cpptrace::runtime_error{"could not build black caps"};
+	}
+	if (compositorCaps == nullptr) {
+		throw cpptrace::runtime_error{"could not build compositor caps"};
+	}
+
+	auto feature = gst_caps_features_new("memory:GLMemory", nullptr);
+	gst_caps_set_features(compositorCaps, 0, feature);
+
 	defer {
 		gst_caps_unref(blacksourceCaps);
 		gst_caps_unref(compositorCaps);
@@ -106,7 +118,7 @@ Compositor::Compositor(Options options, Args args)
 	    "latency",
 	    options.Latency.count(),
 	    "background",
-	    "black",
+	    0, // checker
 	    nullptr
 	);
 
@@ -126,7 +138,12 @@ Compositor::Compositor(Options options, Args args)
 	    this
 	);
 
-	g_object_set(G_OBJECT(d_blacksrc.get()), "pattern", "black", nullptr);
+	g_object_set(
+	    G_OBJECT(d_blacksrc.get()),
+	    "pattern",
+	    2, // black
+	    nullptr
+	);
 
 	gst_bin_add_many(
 	    GST_BIN_CAST(d_pipeline.get()),
@@ -150,9 +167,15 @@ Compositor::Compositor(Options options, Args args)
 	}
 }
 
-Compositor::~Compositor() {}
+Compositor::~Compositor() {
+	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
+}
 
-void Compositor::start(MediaPlayInfo media, int layer) {}
+void Compositor::start() {
+	gst_element_set_state(d_pipeline.get(), GST_STATE_PLAYING);
+}
+
+void Compositor::play(MediaPlayInfo media, int layer) {}
 
 void Compositor::onMessage(GstMessage *msg) noexcept {
 	switch (GST_MESSAGE_TYPE(msg)) {
@@ -196,14 +219,22 @@ GstBusSyncReply Compositor::onSyncMessage(GstMessage *msg) noexcept {
 	d_logger.Info(
 	    "Gstreamer need context",
 	    slog::String("type", contextType),
-	    slog::String("source", msg->src->name)
+	    slog::String("source", (const char *)msg->src->name)
 	);
 	if (g_strcmp0(contextType, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
 		GstContext *displayContext =
 		    gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
 		gst_context_set_gl_display(displayContext, d_display);
 		gst_element_set_context(GST_ELEMENT(msg->src), displayContext);
-	} else if (g_strcmp0(contextType, "gst.gl.app_context") == 0) {
+		slog::Info(
+		    "handled",
+		    slog::String("type", contextType),
+		    slog::String("source", (const char *)msg->src->name),
+		    slog::Pointer("display", d_display)
+		);
+		return GST_BUS_DROP;
+	}
+	if (g_strcmp0(contextType, "gst.gl.app_context") == 0) {
 		d_logger.Debug(
 		    "GstGL Objects",
 		    slog::Pointer("display", d_display),
@@ -219,6 +250,12 @@ GstBusSyncReply Compositor::onSyncMessage(GstMessage *msg) noexcept {
 		    nullptr
 		);
 		gst_element_set_context(GST_ELEMENT(msg->src), appContext);
+		slog::Info(
+		    "handled",
+		    slog::String("type", contextType),
+		    slog::String("source", (const char *)msg->src->name)
+		);
+		return GST_BUS_DROP;
 	}
 
 	return GST_BUS_PASS;
@@ -260,7 +297,9 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 		        slog::Int("height", i.height)
 		    )
 		);
-		emit self->videoInfos(self->d_infos.value());
+		emit self->outputSizeChanged(
+		    {self->d_infos.value().width, self->d_infos.value().height}
+		);
 	}
 
 	auto syncMeta = gst_buffer_get_gl_sync_meta(buffer);

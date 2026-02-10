@@ -1,4 +1,5 @@
-#include "VideoWidget.hpp"
+#include "VideoOutput.hpp"
+#include "yams/Compositor.hpp"
 
 #include <QGuiApplication>
 #include <QMetaEnum>
@@ -15,6 +16,13 @@
 #include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
 
+#include <memory>
+#include <qcoreapplication.h>
+#include <qnamespace.h>
+#include <qobject.h>
+#include <qobjectdefs.h>
+#include <qopenglwindow.h>
+#include <qwindow.h>
 #include <yams/gstreamer/Memory.hpp>
 #include <yams/gstreamer/QOpenGL.hpp>
 #include <yams/utils/slogQt.hpp>
@@ -22,38 +30,12 @@
 #include <gst/video/video.h>
 
 namespace yams {
-VideoWidget::Frame::Frame() {}
 
-VideoWidget::Frame::Frame(GstVideoFrame *frame, QSize size)
-    : VideoFrame{frame}
-    , Size{size} {
-	if (frame == nullptr || frame->buffer == nullptr) {
-		return;
-	}
-
-	Sync = gst_buffer_get_gl_sync_meta(frame->buffer);
-	if (Sync == nullptr) {
-		throw std::runtime_error{"buffer does not contains synchronization data"
-		};
-	}
-
-	TexID = *(guint *)frame->data[0];
-}
-
-void VideoWidget::pushNewFrame(quintptr frame_, QSize size) {
-	auto frame = reinterpret_cast<GstVideoFrame *>(frame_);
-	if (frame == nullptr) {
-		return;
-	}
-	try {
-		d_frame = Frame{frame, size};
-	} catch (std::exception &e) {
-		slog::Error("could not use buffer", slog::String("error", e.what()));
-	}
+void VideoOutput::pushNewFrame(yams::Frame::Ptr) {
 	update();
 }
 
-VideoWidget::VideoWidget(QScreen *target, QWindow *parent)
+VideoOutput::VideoOutput(QScreen *target, QWindow *parent)
     : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent) {
 
 	setCursor(QCursor{Qt::BlankCursor});
@@ -86,9 +68,28 @@ VideoWidget::VideoWidget(QScreen *target, QWindow *parent)
 	QTimer::singleShot(0, this, [this]() { showFullScreen(); });
 }
 
-VideoWidget::~VideoWidget() {}
+void VideoOutput::showOnTarget() {
+	show();
+	QCoreApplication::processEvents();
+	QMetaObject::invokeMethod(
+	    this,
+	    &QOpenGLWindow::showFullScreen,
+	    Qt::QueuedConnection
+	);
+}
 
-void VideoWidget::initializeGL() {
+void VideoOutput::closeEvent(QCloseEvent *event) {
+	d_compositor.reset();
+	QOpenGLWindow::closeEvent(event);
+}
+
+VideoOutput::~VideoOutput() {
+	d_compositor.reset();
+	d_gstreamerThread.quit();
+	d_gstreamerThread.wait();
+}
+
+void VideoOutput::initializeGL() {
 	initializeOpenGLFunctions();
 
 	d_display = fromGuiApplication();
@@ -106,6 +107,37 @@ void VideoWidget::initializeGL() {
 			g_error_free(error);
 		}
 	}
+
+	d_compositor = std::make_unique<Compositor>(
+	    Compositor::Options{
+	        .Size = screen()->geometry().size(),
+	        .FPS  = int(screen()->refreshRate()),
+	    },
+	    Compositor::Args{
+	        .Display = d_display.get(),
+	        .Context = d_context.get(),
+	        .Parent  = nullptr,
+	    }
+	);
+	d_compositor->moveToThread(&d_gstreamerThread);
+	d_gstreamerThread.start();
+	connect(
+	    d_compositor.get(),
+	    &Compositor::outputSizeChanged,
+	    this,
+	    &VideoOutput::updateWorkingSize,
+	    Qt::QueuedConnection
+	);
+	connect(
+	    d_compositor.get(),
+	    &Compositor::newFrame,
+	    this,
+	    &VideoOutput::pushNewFrame,
+	    Qt::QueuedConnection
+	);
+
+	d_compositor->start();
+
 	d_initialized.store(true);
 	d_initialized.notify_all();
 
@@ -167,10 +199,10 @@ void VideoWidget::initializeGL() {
 	frame.fill(Qt::cyan);
 
 	d_placeholder = new QOpenGLTexture(frame);
-	d_frame.Size  = textureSize;
+	d_projection  = computeProjection(textureSize);
 }
 
-VideoWidget::Matrix3f VideoWidget::computeProjection(const QSize &size) const {
+VideoOutput::Matrix3f VideoOutput::computeProjection(const QSize &size) const {
 	auto  ratio = float(d_size.height()) / float(size.height());
 	float width = size.width() * ratio;
 	if (width <= d_size.width()) {
@@ -202,19 +234,24 @@ VideoWidget::Matrix3f VideoWidget::computeProjection(const QSize &size) const {
 	}
 }
 
-void VideoWidget::paintGL() {
+void VideoOutput::updateWorkingSize(QSize size) {
+	d_projection = computeProjection(size);
+	update();
+}
+
+void VideoOutput::paintGL() {
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	d_shader.bind();
 
 	auto loc = d_shader.uniformLocation("scaleMat");
-	glUniformMatrix3fv(loc, 1, GL_FALSE, computeProjection(d_frame.Size).data);
+	glUniformMatrix3fv(loc, 1, GL_FALSE, d_projection.data);
 
 	glActiveTexture(GL_TEXTURE0);
-	if (d_frame.VideoFrame != nullptr) {
-		gst_gl_sync_meta_wait(d_frame.Sync, d_context.get());
-		glBindTexture(GL_TEXTURE_2D, d_frame.TexID);
+	if (d_frame != nullptr) {
+		d_frame->waitSync(d_context.get());
+		glBindTexture(GL_TEXTURE_2D, d_frame->TexID());
 	} else {
 		d_placeholder->bind();
 	}
@@ -222,7 +259,7 @@ void VideoWidget::paintGL() {
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void VideoWidget::resizeGL(int w, int h) {
+void VideoOutput::resizeGL(int w, int h) {
 	auto newSize = QSize{w, h};
 	if (d_size == newSize) {
 		return;
@@ -236,8 +273,9 @@ void VideoWidget::resizeGL(int w, int h) {
 	update();
 }
 
-std::tuple<GstGLDisplay *, GstGLContext *> VideoWidget::wrappedContext() const {
+Compositor *VideoOutput::compositor() {
 	d_initialized.wait(false);
-	return {d_display.get(), d_context.get()};
+	return d_compositor.get();
 }
+
 } // namespace yams

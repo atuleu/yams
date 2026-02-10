@@ -35,7 +35,6 @@ struct MediaPlayInfo {
 } // namespace yams
 
 Q_DECLARE_METATYPE(yams::MediaPlayInfo);
-Q_DECLARE_METATYPE(GstVideoInfo);
 
 namespace yams {
 using namespace std::chrono_literals;
@@ -61,10 +60,12 @@ public:
 	virtual ~Compositor();
 
 public slots:
-	void start(MediaPlayInfo media, int layer);
+	void start();
+	void play(MediaPlayInfo media, int layer);
+	void stop();
 signals:
-	void newFrame(Frame::Ptr frame);
-	void videoInfos(GstVideoInfo infos);
+	void newFrame(yams::Frame::Ptr frame);
+	void outputSizeChanged(QSize size);
 
 protected:
 	void            onMessage(GstMessage *msg) noexcept override;

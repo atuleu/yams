@@ -7,7 +7,7 @@ set(SRC_FILES
 	gstreamer/Pipeline.cpp
 	Frame.cpp
 	Compositor.cpp
-	VideoWidget.cpp
+	VideoOutput.cpp
 	VideoThread.cpp
 )
 
@@ -23,7 +23,7 @@ set(SRC_HEADERS
 	gstreamer/Pipeline.hpp
 	Frame.hpp
 	Compositor.hpp
-	VideoWidget.hpp
+	VideoOutput.hpp
 	VideoThread.hpp
 )
 

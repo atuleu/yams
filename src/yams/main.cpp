@@ -3,15 +3,22 @@
 #include <QScreen>
 #include <QTimer>
 
+#include "Frame.hpp"
+#include "VideoOutput.hpp"
 #include "VideoThread.hpp"
-#include "VideoWidget.hpp"
+#include "yams/Compositor.hpp"
 
+#include <gst/video/video-info.h>
+#include <qobject.h>
+#include <qthread.h>
 #include <slog++/slog++.hpp>
 
 int main(int argc, char *argv[]) {
 
 	gst_init(&argc, &argv);
 	QApplication app(argc, argv);
+
+	qRegisterMetaType<yams::Frame::Ptr>();
 
 	QSurfaceFormat fmt;
 	fmt.setMajorVersion(3);
@@ -33,28 +40,11 @@ int main(int argc, char *argv[]) {
 	    slog::String("model", target->model().toStdString())
 	);
 
-	yams::VideoWidget window{target};
-
-	auto [display, context] = window.wrappedContext();
-
-	yams::VideoThread videoTask{display, context};
-
-	QObject::connect(
-	    &videoTask,
-	    &yams::VideoThread::newFrame,
-	    &window,
-	    &yams::VideoWidget::pushNewFrame,
-	    Qt::QueuedConnection
-	);
-
-	QObject::connect(&videoTask, SIGNAL(finished()), &window, SLOT(close()));
-
-	window.show();
-
-	videoTask.start();
+	yams::VideoOutput window{target};
+	window.showOnTarget();
 	QTimer::singleShot(6000, [&]() {
 		slog::Info("stopping pipeline");
-		videoTask.stopPipeline();
+		window.close();
 	});
 
 	return app.exec();

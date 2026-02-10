@@ -17,7 +17,10 @@ public:
 	Pipeline &operator=(Pipeline &&)      = delete;
 
 protected:
-	virtual void onMessage(GstMessage *msg) noexcept = 0;
+	virtual void onMessage(GstMessage *msg) noexcept {
+		// we need to be defined to receive message when the destructor are
+		// called.
+	}
 
 	virtual GstBusSyncReply onSyncMessage(GstMessage *msg) noexcept {
 		return GST_BUS_PASS;
