@@ -5,6 +5,7 @@
 
 #include <gst/gstclock.h>
 #include <gst/gstevent.h>
+#include <gst/gstformat.h>
 #include <gst/gstpad.h>
 #include <gst/gstpipeline.h>
 #include <qmetaobject.h>
@@ -43,6 +44,7 @@ struct Compositor::LayerData {
 	MediaPipeline *pipeline;
 	GstElementPtr  proxy;
 	GstPadPtr      src, sink;
+	GstEventPtr    segmentEvent;
 };
 
 void Compositor::stop() {
@@ -215,15 +217,50 @@ void Compositor::play(const MediaPlayInfo &media, int layer) {
 	);
 }
 
+slog::Attribute slogGstSegment(const char *name, const GstSegment &segment) {
+	return slog::Group(
+	    name,
+	    slog::Float("rate", segment.rate),
+	    slog::Float("applied_rate", segment.applied_rate),
+	    slog::String(
+	        "format",
+	        (const char *)gst_format_get_name(segment.format)
+	    ),
+	    slog::Int("base", segment.base),
+	    slog::Int("offset", segment.offset),
+	    slog::Int("start", segment.start),
+	    slog::Int("stop", segment.stop),
+	    slog::Int("time", segment.time),
+	    slog::Int("position", segment.position),
+	    slog::Int("duration", segment.duration)
+	);
+}
+
 GstPadProbeReturn Compositor::onSinkEventProbe(
     GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
 ) {
-	auto event = GST_EVENT_TYPE(GST_PAD_PROBE_INFO_DATA(info));
-	// layer->self->d_logger.Info(
-	//     "got event",
-	//     slog::String("type", (const char *)GST_EVENT_TYPE_NAME(event))
-	// );
-	if (event != GST_EVENT_EOS) {
+	auto event = GST_PAD_PROBE_INFO_EVENT(info);
+	if (event == nullptr) {
+		return GST_PAD_PROBE_OK;
+	}
+	auto logger = layer->self->d_logger;
+	if (GST_EVENT_TYPE(event) == GST_EVENT_SEGMENT) {
+		if (layer->segmentEvent == nullptr) {
+			return GST_PAD_PROBE_OK;
+		}
+		const GstSegment *orig, *newSegment;
+		gst_event_parse_segment(event, &orig);
+		gst_event_parse_segment(layer->segmentEvent.get(), &newSegment);
+		layer->self->d_logger.Info(
+		    "replacing event",
+		    slogGstSegment("orig", *orig),
+		    slogGstSegment("new", *newSegment)
+		);
+
+		// gst_pad_send_event(pad, layer->segmentEvent.release());
+		return GST_PAD_PROBE_OK;
+	}
+	if (GST_EVENT_TYPE(event) != GST_EVENT_EOS) {
 		return GST_PAD_PROBE_OK;
 	}
 	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
@@ -286,17 +323,11 @@ void Compositor::playUnsafe(
 	);
 	GstSegment segment;
 	gst_segment_init(&segment, GST_FORMAT_TIME);
-	segment.rate     = 1.0;
-	segment.start    = 0;
-	segment.stop     = GST_CLOCK_TIME_NONE;
-	segment.position = from.count();
-	segment.time     = GST_CLOCK_TIME_NONE;
-
-	auto event = gst_event_new_segment(&segment);
-	if (gst_pad_send_event(layer->sink.get(), event) == false) {
-		d_logger.Error("could not send segment to sink");
-		return;
-	}
+	segment.offset = from.count();
+	segment.start  = 0;
+	segment.stop   = GST_CLOCK_TIME_NONE;
+	segment.rate   = 1.0;
+	layer->segmentEvent.reset(gst_event_new_segment(&segment));
 
 	gst_pad_add_probe(
 	    layer->sink.get(),
@@ -306,7 +337,12 @@ void Compositor::playUnsafe(
 	    nullptr
 	);
 
-	layer->pipeline->play(media);
+	d_logger.Info(
+	    "starting",
+	    slog::String("media", media.Location.toStdString()),
+	    slog::Duration("offset", from)
+	);
+	layer->pipeline->play(media, from);
 }
 
 void Compositor::removeMedia(LayerData *layer) {
@@ -452,7 +488,8 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 		syncMeta =
 		    gst_buffer_add_gl_sync_meta(self->d_gstContext.get(), buffer);
 	}
-	// we mark that we are done with this texture from the Gstreamer context.
+	// we mark that we are done with this texture from the Gstreamer
+	// context.
 	gst_gl_sync_meta_set_sync_point(syncMeta, self->d_gstContext.get());
 
 	auto frame =

@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 		window.showOnTarget();
 	}
 	using namespace std::chrono_literals;
-	QTimer::singleShot(500, [&]() {
+	QTimer::singleShot(2500, [&]() {
 		slog::Info("playing ball pattern");
 		window.compositor()->play(
 		    yams::MediaPlayInfo{
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 		);
 	});
 
-	QTimer::singleShot(2000, [&]() {
+	QTimer::singleShot(3500, [&]() {
 		slog::Info("playing smtpe pattern");
 		window.compositor()->play(
 		    yams::MediaPlayInfo{
@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
 		);
 	});
 
-	QTimer::singleShot(5000, [&]() {
+	QTimer::singleShot(8000, [&]() {
 		slog::Info("stopping");
 		window.close();
 	});

@@ -46,6 +46,7 @@ template <typename T>
 using glib_owned_ptr  = std::unique_ptr<T, GObjectUnrefer<T>>;
 using GstElementPtr   = glib_owned_ptr<GstElement>;
 using GstPadPtr       = glib_owned_ptr<GstPad>;
+using GstEventPtr     = glib_owned_ptr<GstEvent>;
 using GstCapsPtr      = glib_owned_ptr<GstCaps>;
 using GstBusPtr       = glib_owned_ptr<GstBus>;
 using GstMessagePtr   = glib_owned_ptr<GstMessage>;
