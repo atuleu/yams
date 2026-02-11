@@ -1,4 +1,5 @@
 #include "Compositor.hpp"
+#include "yams/utils/fractional.hpp"
 
 #include <chrono>
 
@@ -25,6 +26,7 @@
 
 #include <yams/gstreamer/Thread.hpp>
 #include <yams/utils/defer.hpp>
+#include <yams/utils/slogQt.hpp>
 
 #include <slog++/slog++.hpp>
 
@@ -40,24 +42,18 @@ GstElementPtr GstElementFactoryMake(const char *factory, const char *name) {
 	return GstElementPtr{res};
 }
 
-Compositor::FramePool::Ptr Compositor::s_pool;
-std::once_flag             initialized;
-
 void Compositor::stop() {
 	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
 }
 
 Compositor::Compositor(Options options, Args args)
     : Pipeline{"compositor0", args.Parent}
-    , d_display{args.Display}
-    , d_context{args.Context}
     , d_logger{slog::With(slog::String(
           "pipeline", (const char *)GST_OBJECT_NAME(d_pipeline.get())
-      ))} {
-
-	std::call_once(initialized, []() {
-		s_pool = Compositor::FramePool::Create();
-	});
+      ))}
+    , d_display{args.Display}
+    , d_context{args.Context}
+    , d_pool{FramePool::Create()} {
 
 	d_blacksrc = GstElementFactoryMake("videotestsrc", "blacksrc0");
 	auto blackSourceCapsfilter =
@@ -75,9 +71,15 @@ Compositor::Compositor(Options options, Args args)
 	    nullptr
 	);
 
+	auto [num,denum] = yams::build_fraction(options.FPS);
+
+	d_logger.Info("output settings",
+				  slog::String("framerate",std::to_string(num) + "/" + std::to_string(denum)),
+				  slog::QSize("size",options.Size));
+
 	auto compositorCaps = gst_caps_new_simple(
 	    "video/x-raw",
-	    "framerate",GST_TYPE_FRACTION, options.FPS, 1,
+	    "framerate",GST_TYPE_FRACTION, num,denum,
 		"width", G_TYPE_INT, options.Size.width(),
 	    "height", G_TYPE_INT, options.Size.height(),
 	    nullptr
@@ -216,7 +218,7 @@ GstBusSyncReply Compositor::onSyncMessage(GstMessage *msg) noexcept {
 	}
 	const gchar *contextType;
 	gst_message_parse_context_type(msg, &contextType);
-	d_logger.Info(
+	d_logger.Debug(
 	    "Gstreamer need context",
 	    slog::String("type", contextType),
 	    slog::String("source", (const char *)msg->src->name)
@@ -226,7 +228,7 @@ GstBusSyncReply Compositor::onSyncMessage(GstMessage *msg) noexcept {
 		    gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
 		gst_context_set_gl_display(displayContext, d_display);
 		gst_element_set_context(GST_ELEMENT(msg->src), displayContext);
-		slog::Info(
+		slog::Debug(
 		    "handled",
 		    slog::String("type", contextType),
 		    slog::String("source", (const char *)msg->src->name),
@@ -250,7 +252,7 @@ GstBusSyncReply Compositor::onSyncMessage(GstMessage *msg) noexcept {
 		    nullptr
 		);
 		gst_element_set_context(GST_ELEMENT(msg->src), appContext);
-		slog::Info(
+		slog::Debug(
 		    "handled",
 		    slog::String("type", contextType),
 		    slog::String("source", (const char *)msg->src->name)
@@ -289,14 +291,6 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 		    meta->height
 		);
 		auto i = self->d_infos.value();
-		self->d_logger.Info(
-		    "got format",
-		    slog::Group(
-		        "infos",
-		        slog::Int("width", i.width),
-		        slog::Int("height", i.height)
-		    )
-		);
 		emit self->outputSizeChanged(
 		    {self->d_infos.value().width, self->d_infos.value().height}
 		);
@@ -311,8 +305,9 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 	// we mark that we are done with this texture from the Gstreamer context.
 	gst_gl_sync_meta_set_sync_point(syncMeta, self->d_gstContext.get());
 
-	auto frame = Frame::Ptr{s_pool->Get([](Frame *frame) { frame->unmap(); })};
-	auto allocated = s_pool->PoolSize();
+	auto frame =
+	    Frame::Ptr{self->d_pool->Get([](Frame *frame) { frame->unmap(); })};
+	auto allocated = self->d_pool->PoolSize();
 	if (allocated < 10) {
 		self->d_logger.DDebug(
 		    "GstVideoFrame allocation",
@@ -325,8 +320,8 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 		);
 	} else {
 		self->d_logger.Error(
-		    "Large GstVideoFrame allocation, maybe missing a connection to "
-		    "Compositor::release slot?",
+		    "Large GstVideoFrame allocation, make sure output frame are "
+		    "disposed.",
 		    slog::Int("allocated", allocated)
 		);
 	}

@@ -3,8 +3,10 @@
 #include <QMetaEnum>
 #include <QPoint>
 #include <QRect>
+#include <QScreen>
 #include <QSize>
 
+#include <slog++/Attribute.hpp>
 #include <slog++/slog++.hpp>
 
 namespace slog {
@@ -44,6 +46,16 @@ template <typename Str> slog::Attribute QSize(Str &&name, const QSize &size) {
 	    std::forward<Str>(name),
 	    slog::Int("width", size.width()),
 	    slog::Int("height", size.height())
+	);
+}
+
+template <typename Str>
+constexpr Attribute QScreen(Str &&name, const QScreen &screen) {
+	return Group(
+	    std::forward<Str>(name),
+	    String("name", screen.name().toStdString()),
+	    String("manufacturer", screen.manufacturer().toStdString()),
+	    String("model", screen.model().toStdString())
 	);
 }
 

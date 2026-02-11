@@ -17,6 +17,7 @@ set(SRC_HEADERS
 	utils/slogQt.hpp #
 	utils/Version.hpp #
 	utils/ObjectPool.hpp #
+	utils/fractional.hpp #
 	gstreamer/Memory.hpp #
 	gstreamer/QOpenGL.hpp #
 	gstreamer/Thread.hpp #
@@ -33,6 +34,7 @@ set(SRC_TESTS_FILES
 	gstreamer/PipelineTest.cpp #
 	utils/LoggingTest.cpp #
 	utils/ObjectPoolTest.cpp #
+	utils/fractionalTest.cpp #
 	gstreamer/ThreadTest.cpp #
 )
 

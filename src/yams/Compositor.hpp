@@ -46,7 +46,7 @@ public:
 
 		QSize                    Size    = {1920, 1080};
 		int                      Layers  = 1;
-		int                      FPS     = 60;
+		qreal                    FPS     = 60;
 		std::chrono::nanoseconds Latency = 10ms;
 	};
 
@@ -84,7 +84,7 @@ private:
 	GstElementPtr d_blacksrc, d_compositor;
 
 	using FramePool = ObjectPool<Frame>;
-	static FramePool::Ptr s_pool;
+	FramePool::Ptr d_pool;
 };
 
 } // namespace yams

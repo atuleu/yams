@@ -36,11 +36,8 @@ GstGLDisplayPtr fromGuiApplication() {
 		    ))
 		};
 
-		slog::Info("EGL");
-
 		auto eglDisplay =
 		    gst_gl_display_egl_from_gl_display(waylandDisplay.get());
-		slog::Info("EGL done");
 		gst_clear_object(&eglDisplay);
 
 		return std::move(waylandDisplay);

@@ -37,7 +37,9 @@ void VideoOutput::pushNewFrame(yams::Frame::Ptr frame) {
 }
 
 VideoOutput::VideoOutput(QScreen *target, QWindow *parent)
-    : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent) {
+    : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent)
+    , d_size{target->geometry().size()}
+    , d_inputSize{target->geometry().size()} {
 
 	setCursor(QCursor{Qt::BlankCursor});
 	setFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -63,6 +65,7 @@ VideoOutput::VideoOutput(QScreen *target, QWindow *parent)
 
 	connect(this, &QWindow::visibleChanged, this, displayFormat);
 #endif
+	d_projection = computeProjection();
 }
 
 void VideoOutput::showOnTarget() {
@@ -108,7 +111,7 @@ void VideoOutput::initializeGL() {
 	d_compositor = std::make_unique<Compositor>(
 	    Compositor::Options{
 	        .Size = screen()->geometry().size(),
-	        .FPS  = int(screen()->refreshRate()),
+	        .FPS  = screen()->refreshRate(),
 	    },
 	    Compositor::Args{
 	        .Display = d_display.get(),
@@ -191,17 +194,18 @@ void VideoOutput::initializeGL() {
 	d_frameVBO.release();
 	d_frameVAO.release();
 
-	QSize  textureSize = {320, 240};
+	QSize textureSize = {320, 240};
+	d_inputSize       = textureSize;
 	QImage frame{textureSize, QImage::Format_RGB888};
 	frame.fill(Qt::cyan);
 
 	d_placeholder = new QOpenGLTexture(frame);
-	d_projection  = computeProjection(textureSize);
+	d_projection  = computeProjection();
 }
 
-VideoOutput::Matrix3f VideoOutput::computeProjection(const QSize &size) const {
-	auto  ratio = float(d_size.height()) / float(size.height());
-	float width = size.width() * ratio;
+VideoOutput::Matrix3f VideoOutput::computeProjection() const {
+	auto  ratio = float(d_size.height()) / float(d_inputSize.height());
+	float width = d_inputSize.width() * ratio;
 	if (width <= d_size.width()) {
 		ratio = float(width) / float(d_size.width());
 		// viewport with full height
@@ -215,8 +219,8 @@ VideoOutput::Matrix3f VideoOutput::computeProjection(const QSize &size) const {
 		};
 		// clang-format on
 	} else {
-		float height =
-		    size.height() * float(d_size.width()) / float(size.width());
+		float height = d_inputSize.height() * float(d_size.width()) /
+		               float(d_inputSize.width());
 		ratio = float(height) / float(d_size.height());
 		// viewport with full width
 		// clang-format off
@@ -232,11 +236,16 @@ VideoOutput::Matrix3f VideoOutput::computeProjection(const QSize &size) const {
 }
 
 void VideoOutput::updateWorkingSize(QSize size) {
-	d_projection = computeProjection(size);
+	d_inputSize  = size;
+	d_projection = computeProjection();
 	update();
 }
 
 void VideoOutput::paintGL() {
+	while (d_toDispose.size() > 5) {
+		d_toDispose.pop_front();
+	}
+
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -252,6 +261,9 @@ void VideoOutput::paintGL() {
 	} else {
 		d_placeholder->bind();
 	}
+
+	d_toDispose.push_back(d_frame);
+
 	d_frameVAO.bind();
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
@@ -267,6 +279,7 @@ void VideoOutput::resizeGL(int w, int h) {
 	    slog::Group("size", slog::Int("width", w), slog::Int("height", h))
 	);
 	glViewport(0, 0, w, h);
+	d_projection = computeProjection();
 	update();
 }
 

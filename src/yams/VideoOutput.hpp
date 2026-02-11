@@ -47,12 +47,12 @@ private:
 		float data[9];
 	};
 
-	Matrix3f computeProjection(const QSize &size) const;
+	Matrix3f computeProjection() const;
 
 	QThread                     d_gstreamerThread;
 	std::unique_ptr<Compositor> d_compositor;
 
-	QSize                    d_size = {0, 0};
+	QSize                    d_size, d_inputSize;
 	QOpenGLVertexArrayObject d_frameVAO;
 	QOpenGLBuffer            d_frameVBO;
 	QOpenGLShaderProgram     d_shader;
@@ -62,5 +62,7 @@ private:
 	GstGLDisplayPtr          d_display;
 	GstGLContextPtr          d_context;
 	Matrix3f                 d_projection;
+
+	std::deque<Frame::Ptr> d_toDispose;
 };
 } // namespace yams
