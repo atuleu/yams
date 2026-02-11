@@ -4,7 +4,10 @@
 #include <QApplication>
 #include <gst/gst.h>
 
+#include <slog++/slog++.hpp>
+
 int main(int argc, char **argv) {
+	slog::DefaultLogger().From(slog::Level::Debug);
 	::testing::InitGoogleTest(&argc, argv);
 	::testing::InitGoogleMock(&argc, argv);
 	gst_init(&argc, &argv);

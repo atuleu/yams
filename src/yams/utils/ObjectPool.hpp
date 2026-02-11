@@ -3,7 +3,10 @@
 #include <concurrentqueue.h>
 #include <functional>
 #include <memory>
+#include <source_location>
 #include <type_traits>
+
+#include <slog++/slog++.hpp>
 
 namespace yams {
 
@@ -18,6 +21,17 @@ public:
 	}
 };
 } // namespace details
+
+inline slog::Attribute location(
+    const std::source_location location = std::source_location::current()
+) {
+	return slog::Group(
+	    "location",
+	    slog::String("function", location.function_name()),
+	    slog::String("file", location.file_name()),
+	    slog::Int("line", location.line())
+	);
+}
 
 template <
     typename T,
@@ -43,6 +57,7 @@ public:
 	}
 
 	~ObjectPool() {
+		slog::DDebug("destructor called", location());
 		T *obj{nullptr};
 		while (d_queue.try_dequeue(obj) == true) {
 			d_deleter(obj);

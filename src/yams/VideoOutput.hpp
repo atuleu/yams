@@ -13,8 +13,6 @@
 
 #include <gst/gl/gstgl_fwd.h>
 
-#include <tuple>
-
 namespace yams {
 
 class VideoOutput : public QOpenGLWindow, protected QOpenGLFunctions {
@@ -51,7 +49,7 @@ private:
 
 	Matrix3f computeProjection(const QSize &size) const;
 
-	QThread     d_gstreamerThread;
+	QThread                     d_gstreamerThread;
 	std::unique_ptr<Compositor> d_compositor;
 
 	QSize                    d_size = {0, 0};

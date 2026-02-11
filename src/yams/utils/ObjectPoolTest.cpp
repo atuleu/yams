@@ -27,6 +27,7 @@ protected:
 	}
 
 	void TearDown() {
+		// checks that on deletion we call destructors.
 		pool.reset();
 		EXPECT_EQ(d_constructed.load(), d_deleted.load());
 	}
@@ -37,7 +38,7 @@ TEST_F(ObjectPoolTest, DefaultConstructive) {
 	auto poolB        = PoolDefault::Create();
 }
 
-TEST_F(ObjectPoolTest, DeletesAllAllocatedOnDestruction) {
+TEST_F(ObjectPoolTest, ReusesAllocated) {
 	auto a = pool->Get();
 	auto b = pool->Get();
 	a.reset();
@@ -45,20 +46,14 @@ TEST_F(ObjectPoolTest, DeletesAllAllocatedOnDestruction) {
 	EXPECT_EQ(d_constructed.load(), 2);
 	b.reset();
 	c.reset();
-	pool.reset();
-	EXPECT_EQ(d_constructed.load(), d_deleted.load());
 }
 
 TEST_F(ObjectPoolTest, CanHookOnRelease) {
 	std::atomic<bool> signaled{false};
-	auto a = pool->Get([&signaled](int* v) {
-		signaled.store(true);
-	});
+	auto a = pool->Get([&signaled](int *v) { signaled.store(true); });
 	a.reset();
-	EXPECT_EQ(d_deleted.load(),0);
-	EXPECT_EQ(signaled.load(),true);
-
+	EXPECT_EQ(d_deleted.load(), 0);
+	EXPECT_EQ(signaled.load(), true);
 }
-
 
 } // namespace yams
