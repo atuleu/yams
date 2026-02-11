@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QGuiApplication>
 #include <QObject>
+#include <QOpenGLContext>
 #include <QScreen>
 #include <QTimer>
 
@@ -12,7 +13,11 @@
 #include <algorithm>
 #include <chrono>
 #include <gst/video/video-info.h>
+#include <qcoreapplication.h>
+#include <qmetaobject.h>
+#include <qnamespace.h>
 #include <qobject.h>
+#include <qsurfaceformat.h>
 #include <qthread.h>
 #include <qwindow.h>
 #include <slog++/Attribute.hpp>
@@ -69,22 +74,46 @@ QScreen *selectScreen() {
 	);
 }
 
+template <typename T> std::string enumName(T v) {
+	auto me = QMetaEnum::fromType<T>();
+	return me.valueToKey(v);
+}
+
+void setOpenGLFormat() {
+	QOpenGLContext test;
+	test.create();
+
+	QSurfaceFormat fmt = QSurfaceFormat::defaultFormat();
+	if (test.isOpenGLES()) {
+		fmt.setRenderableType(QSurfaceFormat::OpenGLES);
+		fmt.setMajorVersion(3);
+		fmt.setMinorVersion(0);
+	} else {
+		fmt.setRenderableType(QSurfaceFormat::OpenGL);
+		fmt.setMajorVersion(3);
+		fmt.setMinorVersion(3);
+		fmt.setProfile(QSurfaceFormat::CoreProfile);
+	}
+	QSurfaceFormat::setDefaultFormat(fmt);
+	slog::Info(
+	    "selected target surface format",
+	    slog::QSurfaceFormat("dummy", test.format()),
+	    slog::QSurfaceFormat("target", test.format())
+	);
+}
+
 int main(int argc, char *argv[]) {
+
 	gst_init(&argc, &argv);
-	QApplication app(argc, argv);
+	QGuiApplication app(argc, argv);
+	if (std::getenv("YAMS_DEBUG") != nullptr) {
+		slog::DefaultLogger().From(slog::Level::Debug);
+	}
+	setOpenGLFormat();
 
 	qRegisterMetaType<yams::Frame::Ptr>();
 	qRegisterMetaType<std::chrono::nanoseconds>();
 	qRegisterMetaType<yams::MediaPlayInfo>();
-
-	QSurfaceFormat fmt;
-	fmt.setMajorVersion(3);
-	fmt.setMinorVersion(3);
-	fmt.setProfile(QSurfaceFormat::CoreProfile);
-	fmt.setDepthBufferSize(8);
-	fmt.setStencilBufferSize(8);
-	fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
-	QSurfaceFormat::setDefaultFormat(fmt);
 
 	auto target = selectScreen();
 	slog::Info(

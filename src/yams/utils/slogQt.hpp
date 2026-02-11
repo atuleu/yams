@@ -5,9 +5,13 @@
 #include <QRect>
 #include <QScreen>
 #include <QSize>
+#include <QSurfaceFormat>
 
+#include <iterator>
+#include <qsurfaceformat.h>
 #include <slog++/Attribute.hpp>
 #include <slog++/slog++.hpp>
+#include <string>
 
 namespace slog {
 template <typename Str> slog::Attribute QRect(Str &&name, const QRect &r) {
@@ -56,6 +60,31 @@ constexpr Attribute QScreen(Str &&name, const QScreen &screen) {
 	    String("name", screen.name().toStdString()),
 	    String("manufacturer", screen.manufacturer().toStdString()),
 	    String("model", screen.model().toStdString())
+	);
+}
+
+template <typename Str>
+constexpr Attribute QSurfaceFormat(Str &&name, const QSurfaceFormat &fmt) {
+
+	return Group(
+	    std::forward<Str>(name),
+	    QEnum("renderableType", fmt.renderableType()),
+	    String(
+	        "version",
+	        std::to_string(fmt.majorVersion()) + "." +
+	            std::to_string(fmt.minorVersion())
+	    ),
+	    QEnum("profile", fmt.profile()),
+	    QEnum("swapBehavior", fmt.swapBehavior()),
+	    String(
+	        "RGBABufferSize",
+	        std::to_string(fmt.redBufferSize()) + " " +
+	            std::to_string(fmt.greenBufferSize()) + " " +
+	            std::to_string(fmt.blueBufferSize()) + " " +
+	            std::to_string(fmt.alphaBufferSize())
+	    ),
+	    Int("depthBufferSize", fmt.depthBufferSize()),
+	    Int("stencilBufferSize", fmt.stencilBufferSize())
 	);
 }
 

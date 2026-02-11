@@ -31,7 +31,7 @@ public:
 		QSize                    Size    = {1920, 1080};
 		size_t                   Layers  = 1;
 		qreal                    FPS     = 60;
-		std::chrono::nanoseconds Latency = 10ms;
+		std::chrono::nanoseconds Latency = 100ms;
 	};
 
 	struct Args {
@@ -67,7 +67,7 @@ private:
 	    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
 	);
 
-	static GstPadProbeReturn onBlockProbe(
+	static GstPadProbeReturn onBufferProbe(
 	    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
 	);
 

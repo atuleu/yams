@@ -54,12 +54,7 @@ VideoOutput::VideoOutput(QScreen *target, QWindow *parent)
 		auto actualFormat = this->format();
 		slog::Info(
 		    "windows format",
-		    slog::Int("major", actualFormat.majorVersion()),
-		    slog::Int("minor", actualFormat.majorVersion()),
-		    slog::QEnum("profile", actualFormat.profile()),
-		    slog::QEnum("swapBehavior", actualFormat.swapBehavior()),
-		    slog::Int("depthBufferSize", actualFormat.depthBufferSize()),
-		    slog::Int("stencilBufferSize", actualFormat.stencilBufferSize())
+		    slog::QSurfaceFormat("format", actualFormat)
 		);
 	};
 
@@ -122,6 +117,7 @@ void VideoOutput::initializeGL() {
 	);
 	d_compositor->moveToThread(&d_gstreamerThread);
 	d_gstreamerThread.start();
+
 	connect(
 	    d_compositor.get(),
 	    &Compositor::outputSizeChanged,

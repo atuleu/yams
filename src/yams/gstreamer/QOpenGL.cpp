@@ -1,3 +1,4 @@
+#include <gst/gl/gstglapi.h>
 #include <yams/gstreamer/QOpenGL.hpp>
 
 #include <QGuiApplication>
@@ -73,7 +74,7 @@ wrapQOpenGLContext(GstGLDisplay *display, QOpenGLContext *context) {
 		    display,
 		    (guintptr)native->nativeContext(),
 		    GST_GL_PLATFORM_EGL,
-		    GST_GL_API_OPENGL3
+		    context->isOpenGLES() ? GST_GL_API_GLES2 : GST_GL_API_OPENGL3
 		)};
 	} else {
 		auto native = context->nativeInterface<QNativeInterface::QGLXContext>();
@@ -84,7 +85,7 @@ wrapQOpenGLContext(GstGLDisplay *display, QOpenGLContext *context) {
 		    display,
 		    (guintptr)native->nativeContext(),
 		    GST_GL_PLATFORM_GLX,
-		    GST_GL_API_OPENGL3
+		    context->isOpenGLES() ? GST_GL_API_GLES2 : GST_GL_API_OPENGL3
 		)};
 	}
 #endif
@@ -98,7 +99,7 @@ wrapQOpenGLContext(GstGLDisplay *display, QOpenGLContext *context) {
 	    display,
 	    (guintptr)native->nativeContext(),
 	    GST_GL_PLATFORM_WGL,
-	    GST_GL_API_OPENGL3
+	    context->isOpenGLES() ? GST_GL_API_GLES2 : GST_GL_API_OPENGL3
 	)};
 #endif
 }

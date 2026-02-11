@@ -1,5 +1,6 @@
 #include "Compositor.hpp"
 #include "yams/MediaPipeline.hpp"
+#include "yams/gstreamer/Memory.hpp"
 
 #include <chrono>
 
@@ -40,11 +41,12 @@
 namespace yams {
 
 struct Compositor::LayerData {
-	Compositor    *self;
-	MediaPipeline *pipeline;
-	GstElementPtr  proxy;
-	GstPadPtr      src, sink;
-	GstEventPtr    segmentEvent;
+	Compositor              *self;
+	MediaPipeline           *pipeline;
+	GstElementPtr            proxy;
+	GstPadPtr                src, sink;
+	std::chrono::nanoseconds offset;
+	GstEventPtr              segmentEvent;
 };
 
 void Compositor::stop() {
@@ -273,6 +275,27 @@ GstPadProbeReturn Compositor::onSinkEventProbe(
 	return GST_PAD_PROBE_OK;
 }
 
+GstPadProbeReturn Compositor::onBufferProbe(
+    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
+) {
+	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
+	auto pipeline = layer->self->d_pipeline.get();
+	auto clock    = GstClockPtr{gst_element_get_clock(pipeline)};
+	if (clock == nullptr) {
+		return GST_PAD_PROBE_OK;
+	}
+	auto now       = gst_clock_get_time(clock.get());
+	auto base_time = gst_element_get_base_time(pipeline);
+	auto latency =
+	    std::chrono::nanoseconds{now - base_time - layer->offset.count()};
+	layer->self->d_logger.Info(
+	    "got first buffer",
+	    slog::Duration("latency", latency)
+	);
+
+	return GST_PAD_PROBE_OK;
+}
+
 void Compositor::playUnsafe(
     const MediaPlayInfo &media, int layerIndex, std::chrono::nanoseconds from
 ) {
@@ -323,16 +346,24 @@ void Compositor::playUnsafe(
 	);
 	GstSegment segment;
 	gst_segment_init(&segment, GST_FORMAT_TIME);
-	segment.offset = from.count();
+	segment.offset = -from.count();
 	segment.start  = 0;
 	segment.stop   = GST_CLOCK_TIME_NONE;
 	segment.rate   = 1.0;
 	layer->segmentEvent.reset(gst_event_new_segment(&segment));
-
+	layer->offset = from;
 	gst_pad_add_probe(
 	    layer->sink.get(),
 	    GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
 	    (GstPadProbeCallback)&Compositor::onSinkEventProbe,
+	    layer,
+	    nullptr
+	);
+
+	gst_pad_add_probe(
+	    layer->sink.get(),
+	    GST_PAD_PROBE_TYPE_BUFFER,
+	    (GstPadProbeCallback)&Compositor::onBufferProbe,
 	    layer,
 	    nullptr
 	);
@@ -496,7 +527,7 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 	    Frame::Ptr{self->d_pool->Get([](Frame *frame) { frame->unmap(); })};
 	auto allocated = self->d_pool->PoolSize();
 	if (allocated < 10) {
-		self->d_logger.DDebug(
+		self->d_logger.DTrace(
 		    "GstVideoFrame allocation",
 		    slog::Int("allocated", allocated)
 		);
