@@ -110,8 +110,9 @@ void VideoOutput::initializeGL() {
 
 	d_compositor = std::make_unique<Compositor>(
 	    Compositor::Options{
-	        .Size = screen()->geometry().size(),
-	        .FPS  = screen()->refreshRate(),
+	        .Size   = screen()->geometry().size(),
+	        .Layers = 2,
+	        .FPS    = screen()->refreshRate(),
 	    },
 	    Compositor::Args{
 	        .Display = d_display.get(),

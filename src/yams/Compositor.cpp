@@ -1,7 +1,15 @@
 #include "Compositor.hpp"
-#include "yams/utils/fractional.hpp"
+#include "yams/MediaPipeline.hpp"
 
 #include <chrono>
+
+#include <gst/gstclock.h>
+#include <gst/gstevent.h>
+#include <gst/gstpad.h>
+#include <gst/gstpipeline.h>
+#include <qmetaobject.h>
+#include <qnamespace.h>
+#include <slog++/slog++.hpp>
 
 #include <cpptrace/exceptions.hpp>
 
@@ -22,25 +30,20 @@
 #include <gst/gstutils.h>
 #include <gst/gstvalue.h>
 
-#include <mutex>
-
+#include <yams/gstreamer/Factory.hpp>
 #include <yams/gstreamer/Thread.hpp>
 #include <yams/utils/defer.hpp>
+#include <yams/utils/fractional.hpp>
 #include <yams/utils/slogQt.hpp>
 
-#include <slog++/slog++.hpp>
-
 namespace yams {
-GstElementPtr GstElementFactoryMake(const char *factory, const char *name) {
-	auto res = gst_element_factory_make(factory, name);
-	if (res == nullptr) {
-		throw cpptrace::runtime_error{
-		    "could not make element: gst_element_factory_make('" +
-		    std::string(factory) + "','" + std::string{name} + "')"
-		};
-	}
-	return GstElementPtr{res};
-}
+
+struct Compositor::LayerData {
+	Compositor    *self;
+	MediaPipeline *pipeline;
+	GstElementPtr  proxy;
+	GstPadPtr      src, sink;
+};
 
 void Compositor::stop() {
 	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
@@ -53,7 +56,21 @@ Compositor::Compositor(Options options, Args args)
       ))}
     , d_display{args.Display}
     , d_context{args.Context}
-    , d_pool{FramePool::Create()} {
+    , d_pool{FramePool::Create()}
+    , d_size{options.Size} {
+
+	if (options.Layers > 3) {
+		throw cpptrace::invalid_argument{
+		    "unsupported number of layers (" + std::to_string(options.Layers) +
+		    ") max:3"
+		};
+	}
+
+	d_clock =
+	    GstClockPtr{gst_pipeline_get_clock(GST_PIPELINE(d_pipeline.get()))};
+
+	auto clock = GstClockPtr{gst_system_clock_obtain()};
+	gst_pipeline_use_clock(GST_PIPELINE(d_pipeline.get()), clock.get());
 
 	d_blacksrc = GstElementFactoryMake("videotestsrc", "blacksrc0");
 	auto blackSourceCapsfilter =
@@ -167,6 +184,8 @@ Compositor::Compositor(Options options, Args args)
 	    ) == false) {
 		throw cpptrace::runtime_error{"could not link pipeline elements"};
 	}
+
+	buildLayers(options);
 }
 
 Compositor::~Compositor() {
@@ -177,7 +196,138 @@ void Compositor::start() {
 	gst_element_set_state(d_pipeline.get(), GST_STATE_PLAYING);
 }
 
-void Compositor::play(MediaPlayInfo media, int layer) {}
+void Compositor::play(const MediaPlayInfo &media, int layer) {
+	auto runningTime = std::chrono::nanoseconds{
+	    gst_clock_get_time(d_clock.get()) -
+	    gst_element_get_base_time(d_pipeline.get())
+	};
+	if (QThread::currentThread() == this->thread()) {
+		this->playUnsafe(media, layer, runningTime);
+		return;
+	}
+	QMetaObject::invokeMethod(
+	    this,
+	    &Compositor::playUnsafe,
+	    Qt::QueuedConnection,
+	    media,
+	    layer,
+	    runningTime
+	);
+}
+
+GstPadProbeReturn Compositor::onSinkEventProbe(
+    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
+) {
+	auto event = GST_EVENT_TYPE(GST_PAD_PROBE_INFO_DATA(info));
+	// layer->self->d_logger.Info(
+	//     "got event",
+	//     slog::String("type", (const char *)GST_EVENT_TYPE_NAME(event))
+	// );
+	if (event != GST_EVENT_EOS) {
+		return GST_PAD_PROBE_OK;
+	}
+	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
+	QMetaObject::invokeMethod(
+	    layer->self,
+	    &Compositor::removeMedia,
+	    Qt::QueuedConnection,
+	    layer
+	);
+	return GST_PAD_PROBE_OK;
+}
+
+void Compositor::playUnsafe(
+    const MediaPlayInfo &media, int layerIndex, std::chrono::nanoseconds from
+) {
+	if (layerIndex != 0) {
+		d_logger.Warn("only single layer supported");
+		return;
+	}
+
+	auto layer = d_layers[layerIndex].get();
+
+	g_object_set(
+	    layer->proxy.get(),
+	    "proxysink",
+	    layer->pipeline->proxySink(),
+	    nullptr
+	);
+
+	if (gst_element_link_many(
+	        layer->proxy.get(),
+	        d_compositor.get(),
+	        nullptr
+	    ) == false) {
+
+		d_logger.Error("could not link proxysink to compositor");
+		return;
+	}
+
+	layer->src.reset(gst_element_get_static_pad(layer->proxy.get(), "src"));
+	if (layer->src == nullptr) {
+		d_logger.Error("could not find the src pad?");
+		return;
+	}
+
+	layer->sink.reset(gst_pad_get_peer(layer->src.get()));
+	if (layer->sink == nullptr) {
+		d_logger.Error("could not find sink pad on compositor");
+		return;
+	}
+	g_object_set(
+	    layer->sink.get(),
+	    "width",
+	    d_size.width(),
+	    "height",
+	    d_size.height(),
+	    "sizing-policy",
+	    1,
+	    nullptr
+	);
+	GstSegment segment;
+	gst_segment_init(&segment, GST_FORMAT_TIME);
+	segment.rate     = 1.0;
+	segment.start    = 0;
+	segment.stop     = GST_CLOCK_TIME_NONE;
+	segment.position = from.count();
+	segment.time     = GST_CLOCK_TIME_NONE;
+
+	auto event = gst_event_new_segment(&segment);
+	if (gst_pad_send_event(layer->sink.get(), event) == false) {
+		d_logger.Error("could not send segment to sink");
+		return;
+	}
+
+	gst_pad_add_probe(
+	    layer->sink.get(),
+	    GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
+	    (GstPadProbeCallback)&Compositor::onSinkEventProbe,
+	    layer,
+	    nullptr
+	);
+
+	layer->pipeline->play(media);
+}
+
+void Compositor::removeMedia(LayerData *layer) {
+	if (gst_pad_unlink(layer->src.get(), layer->sink.get()) == false) {
+		d_logger.Error(
+		    "could not unlink pads",
+		    slog::String(
+		        "source",
+		        (const char *)GST_OBJECT_NAME(layer->src.get())
+		    ),
+		    slog::String(
+		        "sink",
+		        (const char *)GST_OBJECT_NAME(layer->sink.get())
+		    )
+		);
+		return;
+	}
+	layer->src.reset();
+	gst_element_release_request_pad(d_compositor.get(), layer->sink.get());
+	layer->sink.reset();
+}
 
 void Compositor::onMessage(GstMessage *msg) noexcept {
 	switch (GST_MESSAGE_TYPE(msg)) {
@@ -340,6 +490,28 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 	emit self->newFrame(frame);
 
 	return GST_FLOW_OK;
+}
+
+void Compositor::buildLayers(const Options &opts) {
+	for (size_t i = 0; i < opts.Layers; ++i) {
+		auto proxySrc = GstElementFactoryMake(
+		    "proxysrc",
+		    ("videosrc" + std::to_string(i)).c_str()
+		);
+
+		auto pipeline = new MediaPipeline{
+		    {.ID = i, .Size = opts.Size, .FPS = opts.FPS},
+		    this
+		};
+
+		gst_bin_add(GST_BIN(d_pipeline.get()), g_object_ref(proxySrc.get()));
+
+		d_layers.emplace_back(new LayerData{
+		    .self     = this,
+		    .pipeline = pipeline,
+		    .proxy    = std::move(proxySrc)
+		});
+	}
 }
 
 } // namespace yams

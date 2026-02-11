@@ -6,6 +6,7 @@ set(SRC_FILES
 	gstreamer/QOpenGL.cpp #
 	gstreamer/Pipeline.cpp
 	Frame.cpp
+	MediaPipeline.cpp
 	Compositor.cpp
 	VideoOutput.cpp
 	VideoThread.cpp
@@ -22,6 +23,9 @@ set(SRC_HEADERS
 	gstreamer/QOpenGL.hpp #
 	gstreamer/Thread.hpp #
 	gstreamer/Pipeline.hpp
+	gstreamer/Factory.hpp
+	MediaPlayInfo.hpp
+	MediaPipeline.hpp
 	Frame.hpp
 	Compositor.hpp
 	VideoOutput.hpp

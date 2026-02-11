@@ -3,6 +3,7 @@
 #include <gst/gl/gstgl_fwd.h>
 #include <gst/gst.h>
 
+#include <gst/gstclock.h>
 #include <gst/gstobject.h>
 #include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
@@ -44,9 +45,11 @@ template <typename T> struct GObjectUnrefer {
 template <typename T>
 using glib_owned_ptr  = std::unique_ptr<T, GObjectUnrefer<T>>;
 using GstElementPtr   = glib_owned_ptr<GstElement>;
+using GstPadPtr       = glib_owned_ptr<GstPad>;
 using GstCapsPtr      = glib_owned_ptr<GstCaps>;
 using GstBusPtr       = glib_owned_ptr<GstBus>;
 using GstMessagePtr   = glib_owned_ptr<GstMessage>;
 using GstGLDisplayPtr = glib_owned_ptr<GstGLDisplay>;
 using GstGLContextPtr = glib_owned_ptr<GstGLContext>;
+using GstClockPtr     = glib_owned_ptr<GstClock>;
 } // namespace yams

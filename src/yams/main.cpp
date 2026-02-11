@@ -6,9 +6,11 @@
 
 #include "Frame.hpp"
 #include "VideoOutput.hpp"
+#include "yams/Compositor.hpp"
 #include "yams/utils/slogQt.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <gst/video/video-info.h>
 #include <qobject.h>
 #include <qthread.h>
@@ -68,11 +70,12 @@ QScreen *selectScreen() {
 }
 
 int main(int argc, char *argv[]) {
-
 	gst_init(&argc, &argv);
 	QApplication app(argc, argv);
 
 	qRegisterMetaType<yams::Frame::Ptr>();
+	qRegisterMetaType<std::chrono::nanoseconds>();
+	qRegisterMetaType<yams::MediaPlayInfo>();
 
 	QSurfaceFormat fmt;
 	fmt.setMajorVersion(3);
@@ -97,7 +100,36 @@ int main(int argc, char *argv[]) {
 	} else {
 		window.showOnTarget();
 	}
-	QTimer::singleShot(1000, [&]() {
+	using namespace std::chrono_literals;
+	QTimer::singleShot(500, [&]() {
+		slog::Info("playing ball pattern");
+		window.compositor()->play(
+		    yams::MediaPlayInfo{
+		        .MediaType = yams::MediaPlayInfo::Type::TEST,
+		        .Location  = "ball",
+		        .Duration  = 2s,
+		        .Fade      = 500ms,
+		        .Loop      = true,
+		    },
+		    0
+		);
+	});
+
+	QTimer::singleShot(2000, [&]() {
+		slog::Info("playing smtpe pattern");
+		window.compositor()->play(
+		    yams::MediaPlayInfo{
+		        .MediaType = yams::MediaPlayInfo::Type::TEST,
+		        .Location  = "smtpe",
+		        .Duration  = 2s,
+		        .Fade      = 500ms,
+		        .Loop      = false,
+		    },
+		    1
+		);
+	});
+
+	QTimer::singleShot(5000, [&]() {
 		slog::Info("stopping");
 		window.close();
 	});
