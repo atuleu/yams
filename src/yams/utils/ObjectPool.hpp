@@ -3,7 +3,6 @@
 #include <concurrentqueue.h>
 #include <functional>
 #include <memory>
-#include <source_location>
 #include <type_traits>
 
 #include <slog++/slog++.hpp>

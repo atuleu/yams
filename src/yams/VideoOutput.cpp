@@ -31,7 +31,8 @@
 
 namespace yams {
 
-void VideoOutput::pushNewFrame(yams::Frame::Ptr) {
+void VideoOutput::pushNewFrame(yams::Frame::Ptr frame) {
+	d_frame = frame;
 	update();
 }
 
@@ -43,6 +44,7 @@ VideoOutput::VideoOutput(QScreen *target, QWindow *parent)
 	setScreen(target);
 	setGeometry(target->geometry());
 
+#ifndef NDEBUG
 	auto displayFormat = [this, target](bool visible) {
 		if (visible == false) {
 			return;
@@ -60,12 +62,7 @@ VideoOutput::VideoOutput(QScreen *target, QWindow *parent)
 	};
 
 	connect(this, &QWindow::visibleChanged, this, displayFormat);
-
-	// we need to show, processEvents and make fullscreen to avoid race
-	// conditions in cosmic-comp. Your Mileage May Vary.
-	show();
-	QCoreApplication::processEvents();
-	QTimer::singleShot(0, this, [this]() { showFullScreen(); });
+#endif
 }
 
 void VideoOutput::showOnTarget() {

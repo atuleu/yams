@@ -41,7 +41,11 @@ int main(int argc, char *argv[]) {
 	);
 
 	yams::VideoOutput window{target};
-	window.showOnTarget();
+	if (screens.size() == 1) {
+		window.show();
+	} else {
+		window.showOnTarget();
+	}
 	QTimer::singleShot(6000, [&]() {
 		slog::Info("stopping pipeline");
 		window.close();
