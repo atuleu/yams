@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# Ensures we have formatted our code.
+
+code=0
+
+cppfiles=$(git diff --cached --name-only --diff-filter=ACMRT | grep "\.[ch]\(pp\)*$")
+if [ "$cppfiles" != "" ]; then
+	echo "Checking C++ file formatting... on $cppfiles"
+	diff -u <(cat $cppfiles) <(clang-format $cppfiles)
+	if [ $? -ne 0 ]; then
+		echo "❌ C++ formatting violations detected. Please run:"
+		echo "    clang-format $cppfiles"
+		echo "in $PWD"
+		code=1
+	else
+		echo "✓ C++ formatting check passed"
+	fi
+fi
+
+
+cmakefiles=$(git diff --cached --name-only --diff-filter=ACMRT | grep "CMakeLists.txt")
+if [ "$cmakefiles" != "" ]; then
+	echo "Checking cmake file formatting... on $cmakefiles"
+	diff -u <(cat $cmakefiles) <(cmake-format $cmakefiles)
+	# Check CMakeLists.txt files in src/, excluding build and 3rdparty
+	if [ $? -ne 0 ]; then
+		echo "❌ CMake formatting violations detected. Please run:"
+		echo "   cmake-format $cmakefiles"
+		echo "in $PWD"
+		code=1
+	else
+		echo "✓ CMake formatting check passed"
+	fi
+fi
+
+exit $code
