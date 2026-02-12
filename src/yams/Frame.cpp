@@ -1,6 +1,8 @@
 #include "Frame.hpp"
 
+#include <chrono>
 #include <gst/gl/gstglsyncmeta.h>
+#include <gst/gstbuffer.h>
 #include <mutex>
 #include <stdexcept>
 
@@ -44,6 +46,18 @@ guint Frame::TexID() {
 		return 0;
 	};
 	return *(guint *)(d_frame->data[0]);
+}
+
+std::chrono::nanoseconds Frame::PTS() const {
+	return std::chrono::nanoseconds{GST_BUFFER_PTS(d_frame->buffer)};
+}
+
+std::chrono::nanoseconds Frame::DTS() const {
+	return std::chrono::nanoseconds{GST_BUFFER_DTS(d_frame->buffer)};
+}
+
+std::chrono::nanoseconds Frame::Duration() const {
+	return std::chrono::nanoseconds{GST_BUFFER_DURATION(d_frame->buffer)};
 }
 
 }; // namespace yams

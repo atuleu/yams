@@ -1,10 +1,12 @@
 #include "Compositor.hpp"
 #include "yams/MediaPipeline.hpp"
+#include "yams/MediaPlayInfo.hpp"
 #include "yams/gstreamer/Memory.hpp"
 
 #include <chrono>
 
 #include <gst/gstclock.h>
+#include <gst/gstelementfactory.h>
 #include <gst/gstevent.h>
 #include <gst/gstformat.h>
 #include <gst/gstpad.h>
@@ -41,38 +43,48 @@
 
 namespace yams {
 
-struct Compositor::SinkData {
-	Compositor::LayerData   &layer;
+struct Compositor::InputData {
+	LayerData               &layer;
+	slog::Logger<3>          d_logger;
 	MediaPipeline           *pipeline;
 	GstElementPtr            proxysrc;
 	GstPadPtr                src, sink;
 	std::chrono::nanoseconds offset;
 
-	SinkData(Compositor::LayerData &layer, int layerID, int ID);
+	void
+	playMedia(const MediaPlayInfo &, std::chrono::nanoseconds atRunningTime);
+
+	InputData(
+	    LayerData &layer, size_t layerID, size_t sinkID, const Options &options
+	);
 };
 
 struct Compositor::LayerData {
-	Compositor               &compositor;
-	std::unique_ptr<SinkData> sinks[2];
+	Compositor     &compositor;
+	slog::Logger<2> d_logger;
+	InputData       inputs[2];
+	size_t          next{0};
+	bool            playing{false};
 
-	LayerData(Compositor &parent, int layerID)
+	InputData &nextSink() {
+		return inputs[next % 2];
+	}
+
+	LayerData(Compositor &parent, size_t layerID, const Options &opts)
 	    : compositor{parent}
-	    , sinks{
-	          std::make_unique<SinkData>(*this, layerID, 0),
-	          std::make_unique<SinkData>(*this, layerID, 1)
-	      } {}
+	    , d_logger{parent.d_logger.With(slog::Int("layer", layerID))}
+	    , inputs{{*this, layerID, 0, opts}, {*this, layerID, 1, opts}} {}
 };
 
-Compositor::SinkData::SinkData(
-    Compositor::LayerData &layer,
-    int                    layerID,
-    int                    ID,
-    const QSize           &size,
-    qreal                  FPS
-) {
-	proxysrc = GstElementFactoryMake(
+Compositor::InputData::InputData(
+    LayerData &parent, size_t layerID, size_t inputID, const Options &opts
+)
+    : layer{parent}
+    , d_logger{parent.d_logger.With(slog::Int("input", inputID))} {
+	proxysrc = GstElementFactoryMakeFull(
 	    "proxysrc",
-	    (std::to_string(layerID) + "-" + std::to_string(ID)).c_str()
+	    "name",
+	    (std::to_string(layerID) + "_" + std::to_string(inputID)).c_str()
 	);
 	auto compositor = &layer.compositor;
 
@@ -80,8 +92,12 @@ Compositor::SinkData::SinkData(
 	    GST_BIN(compositor->d_pipeline.get()),
 	    g_object_ref(proxysrc.get())
 	);
+
 	pipeline = new MediaPipeline{
-	    {.ID = size_t(layerID * 2 + ID), .Size = size, .FPS = FPS},
+	    {.LayerID = layerID,
+	     .SinkID  = inputID,
+	     .Size    = opts.Size,
+	     .FPS     = opts.FPS},
 	    compositor
 	};
 
@@ -91,6 +107,53 @@ Compositor::SinkData::SinkData(
 		delete pipeline;
 		throw cpptrace::runtime_error{"could not found src pad on sink"};
 	}
+}
+
+void Compositor::InputData::playMedia(
+    const MediaPlayInfo &infos, std::chrono::nanoseconds atRunningTime
+) {
+	// offset all time going from that pad, before doing anything
+	gst_pad_set_offset(src.get(), atRunningTime.count());
+
+	if (gst_element_link_many(
+	        proxysrc.get(),
+	        layer.compositor.d_videoMixer.get(),
+	        nullptr
+	    ) == false) {
+		d_logger.Error("could not link proxysink to videomixer");
+		return;
+	}
+
+	sink.reset(gst_pad_get_peer(src.get()));
+	if (sink == nullptr) {
+		d_logger.Error("could not find sink pad on compositor");
+		return;
+	}
+	// clang-format off
+	g_object_set(
+	    sink.get(),
+	    "width", layer.compositor.d_size.width(),
+	    "height", layer.compositor.d_size.height(),
+	    "sizing-policy", 1,
+	    nullptr
+	);
+	// clang-format on
+	offset = atRunningTime;
+	gst_pad_add_probe(
+	    sink.get(),
+	    GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
+	    (GstPadProbeCallback)&Compositor::onSinkEventProbe,
+	    this,
+	    nullptr
+	);
+
+	d_logger.Info(
+	    "starting",
+	    slog::String("media", infos.Location.toStdString()),
+	    slog::Duration("offset", atRunningTime)
+	);
+
+	pipeline->play(infos);
 }
 
 void Compositor::stop() {
@@ -113,19 +176,8 @@ Compositor::Compositor(Options options, Args args)
 		    ") max:3"
 		};
 	}
-
-	d_clock =
-	    GstClockPtr{gst_pipeline_get_clock(GST_PIPELINE(d_pipeline.get()))};
-
-	auto clock = GstClockPtr{gst_system_clock_obtain()};
-	gst_pipeline_use_clock(GST_PIPELINE(d_pipeline.get()), clock.get());
-
-	d_blacksrc = GstElementFactoryMake("videotestsrc", "blacksrc0");
-	auto blackSourceCapsfilter =
-	    GstElementFactoryMake("capsfilter", "blacksrcfilter0");
-	d_compositor              = GstElementFactoryMake("glvideomixer", "vmix");
-	auto compositorCapsfilter = GstElementFactoryMake("capsfilter", "vmixcaps");
-	auto appsink              = GstElementFactoryMake("appsink", "sink0");
+	d_clock = GstClockPtr{gst_system_clock_obtain()};
+	gst_pipeline_use_clock(GST_PIPELINE(d_pipeline.get()), d_clock.get());
 
 	// clang-format off
 	auto blacksourceCaps = gst_caps_new_simple(
@@ -165,38 +217,42 @@ Compositor::Compositor(Options options, Args args)
 		gst_caps_unref(compositorCaps);
 	};
 
-	g_object_set(
-	    G_OBJECT(blackSourceCapsfilter.get()),
-	    "caps",
-	    blacksourceCaps,
-	    nullptr
+	// clang-format off
+	d_blacksrc = GstElementFactoryMakeFull(
+	    "videotestsrc",
+	    "name", "blacksrc0",
+		"is-live", false,
+		"do-timestamp", true,
+	    "pattern", 2
+	);
+	auto blackSourceCapsfilter = GstElementFactoryMakeFull(
+	    "capsfilter",
+	    "name", "blacksrcfilter0",
+	    "caps", blacksourceCaps
 	);
 
-	g_object_set(
-	    G_OBJECT(compositorCapsfilter.get()),
-	    "caps",
-	    compositorCaps,
-	    nullptr
-	);
-	using namespace std::chrono_literals;
-
-	g_object_set(
-	    G_OBJECT(d_compositor.get()),
-	    "latency",
-	    options.Latency.count(),
-	    "background",
-	    0, // checker
-	    nullptr
+	d_playAdditionnalLatency = 400ms;
+	d_videoMixer = GstElementFactoryMakeFull(
+	    "glvideomixer",
+	    "name", "vmix",
+		"async-handling", false,
+	    "force-live", true,
+	    "background", 1,
+	    "latency", 400ms
 	);
 
-	g_object_set(
-	    G_OBJECT(appsink.get()),
-	    "emit-signals",
-	    TRUE,
-	    "sync",
-	    TRUE,
-	    nullptr
+	auto compositorCapsfilter = GstElementFactoryMakeFull(
+	    "capsfilter",
+	    "name", "vmixcaps",
+	    "caps", compositorCaps
 	);
+	auto appsink = GstElementFactoryMakeFull(
+	    "appsink",
+	    "name", "sink0",
+	    "emit-signals", true,
+	    "sync", true
+	);
+	// clang-format on
 
 	g_signal_connect(
 	    appsink.get(),
@@ -205,18 +261,11 @@ Compositor::Compositor(Options options, Args args)
 	    this
 	);
 
-	g_object_set(
-	    G_OBJECT(d_blacksrc.get()),
-	    "pattern",
-	    2, // black
-	    nullptr
-	);
-
 	gst_bin_add_many(
 	    GST_BIN_CAST(d_pipeline.get()),
 	    g_object_ref(d_blacksrc.get()),
 	    g_object_ref(blackSourceCapsfilter.get()),
-	    g_object_ref(d_compositor.get()),
+	    g_object_ref(d_videoMixer.get()),
 	    g_object_ref(compositorCapsfilter.get()),
 	    g_object_ref(appsink.get()),
 	    nullptr
@@ -225,7 +274,7 @@ Compositor::Compositor(Options options, Args args)
 	if (gst_element_link_many(
 	        d_blacksrc.get(),
 	        blackSourceCapsfilter.get(),
-	        d_compositor.get(),
+	        d_videoMixer.get(),
 	        compositorCapsfilter.get(),
 	        appsink.get(),
 	        nullptr
@@ -246,11 +295,10 @@ void Compositor::start() {
 
 void Compositor::play(const MediaPlayInfo &media, int layer) {
 	auto runningTime = std::chrono::nanoseconds{
-	    gst_clock_get_time(d_clock.get()) -
-	    gst_element_get_base_time(d_pipeline.get())
+	    gst_element_get_current_running_time(d_pipeline.get())
 	};
 	if (QThread::currentThread() == this->thread()) {
-		this->playUnsafe(media, layer, runningTime);
+		this->playUnsafe(media, layer, runningTime + d_playAdditionnalLatency);
 		return;
 	}
 	QMetaObject::invokeMethod(
@@ -283,44 +331,20 @@ slog::Attribute slogGstSegment(const char *name, const GstSegment &segment) {
 }
 
 GstPadProbeReturn Compositor::onSinkEventProbe(
-    GstPad *pad, GstPadProbeInfo *info, Compositor::SinkData *layer
+    GstPad *pad, GstPadProbeInfo *info, InputData *input
 ) {
 	auto event = GST_PAD_PROBE_INFO_EVENT(info);
-	if (event == nullptr) {
-		return GST_PAD_PROBE_OK;
-	}
-	if (GST_EVENT_TYPE(event) != GST_EVENT_EOS) {
+	if (event == nullptr || GST_EVENT_TYPE(event) != GST_EVENT_EOS) {
 		return GST_PAD_PROBE_OK;
 	}
 
 	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
 	QMetaObject::invokeMethod(
-	    layer->self,
+	    &input->layer.compositor,
 	    &Compositor::removeMedia,
 	    Qt::QueuedConnection,
-	    layer
+	    input
 	);
-	return GST_PAD_PROBE_OK;
-}
-
-GstPadProbeReturn Compositor::onBufferProbe(
-    GstPad *pad, GstPadProbeInfo *info, Compositor::SinkData *layer
-) {
-	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
-	auto pipeline = layer->self->d_pipeline.get();
-	auto clock    = GstClockPtr{gst_element_get_clock(pipeline)};
-	if (clock == nullptr) {
-		return GST_PAD_PROBE_OK;
-	}
-	auto now       = gst_clock_get_time(clock.get());
-	auto base_time = gst_element_get_base_time(pipeline);
-	auto latency =
-	    std::chrono::nanoseconds{now - base_time - layer->offset.count()};
-	layer->self->d_logger.Info(
-	    "got first buffer",
-	    slog::Duration("latency", latency)
-	);
-
 	return GST_PAD_PROBE_OK;
 }
 
@@ -333,94 +357,27 @@ void Compositor::playUnsafe(
 	}
 
 	auto layer = d_layers[layerIndex].get();
-
-	g_object_set(
-	    layer->proxysrc.get(),
-	    "proxysink",
-	    layer->pipeline->proxySink(),
-	    nullptr
-	);
-
-	if (gst_element_link_many(
-	        layer->proxysrc.get(),
-	        d_compositor.get(),
-	        nullptr
-	    ) == false) {
-
-		d_logger.Error("could not link proxysink to compositor");
-		return;
-	}
-
-	layer->src.reset(gst_element_get_static_pad(layer->proxysrc.get(), "src"));
-	if (layer->src == nullptr) {
-		d_logger.Error("could not find the src pad?");
-		return;
-	}
-
-	// offset all time going from that pad, before doing anything
-	gst_pad_set_offset(layer->src.get(), from.count());
-
-	layer->sink.reset(gst_pad_get_peer(layer->src.get()));
-	if (layer->sink == nullptr) {
-		d_logger.Error("could not find sink pad on compositor");
-		return;
-	}
-
-	g_object_set(
-	    layer->sink.get(),
-	    "width",
-	    d_size.width(),
-	    "height",
-	    d_size.height(),
-	    "sizing-policy",
-	    1,
-	    nullptr
-	);
-
-	layer->offset = from;
-	gst_pad_add_probe(
-	    layer->sink.get(),
-	    GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
-	    (GstPadProbeCallback)&Compositor::onSinkEventProbe,
-	    layer,
-	    nullptr
-	);
-
-	gst_pad_add_probe(
-	    layer->sink.get(),
-	    GST_PAD_PROBE_TYPE_BUFFER,
-	    (GstPadProbeCallback)&Compositor::onBufferProbe,
-	    layer,
-	    nullptr
-	);
-
-	d_logger.Info(
-	    "starting",
-	    slog::String("media", media.Location.toStdString()),
-	    slog::Duration("offset", from)
-	);
-
-	layer->pipeline->play(media, from);
+	layer->inputs[0].playMedia(media, from);
 }
 
-void Compositor::removeMedia(SinkData *layer) {
-	if (gst_pad_unlink(layer->src.get(), layer->sink.get()) == false) {
+void Compositor::removeMedia(InputData *input) {
+	input->d_logger.Info("clearing pipeline");
+	if (gst_pad_unlink(input->src.get(), input->sink.get()) == false) {
 		d_logger.Error(
 		    "could not unlink pads",
 		    slog::String(
 		        "source",
-		        (const char *)GST_OBJECT_NAME(layer->src.get())
+		        (const char *)GST_OBJECT_NAME(input->src.get())
 		    ),
 		    slog::String(
 		        "sink",
-		        (const char *)GST_OBJECT_NAME(layer->sink.get())
+		        (const char *)GST_OBJECT_NAME(input->sink.get())
 		    )
 		);
 		return;
 	}
-	layer->src.reset();
-	gst_element_release_request_pad(d_compositor.get(), layer->sink.get());
-	layer->sink.reset();
+	gst_element_release_request_pad(d_videoMixer.get(), input->sink.get());
+	input->sink.reset();
 }
 
 void Compositor::onMessage(GstMessage *msg) noexcept {
@@ -589,23 +546,7 @@ GstFlowReturn Compositor::onNewSampleCb(GstElement *appsink, Compositor *self) {
 
 void Compositor::buildLayers(const Options &opts) {
 	for (size_t i = 0; i < opts.Layers; ++i) {
-		auto proxySrc = GstElementFactoryMake(
-		    "proxysrc",
-		    ("videosrc" + std::to_string(i)).c_str()
-		);
-
-		auto pipeline = new MediaPipeline{
-		    {.ID = i, .Size = opts.Size, .FPS = opts.FPS},
-		    this
-		};
-
-		gst_bin_add(GST_BIN(d_pipeline.get()), g_object_ref(proxySrc.get()));
-
-		d_layers.emplace_back(new SinkData{
-		    .self     = this,
-		    .pipeline = pipeline,
-		    .proxysrc = std::move(proxySrc)
-		});
+		d_layers.emplace_back(std::make_unique<LayerData>(*this, i, opts));
 	}
 }
 

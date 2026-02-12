@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <gst/gl/gstglcontext.h>
 #include <gst/gst.h>
 #include <gst/video/video-info.h>
@@ -24,6 +25,10 @@ public:
 
 	void  waitSync(GstGLContext *);
 	guint TexID();
+
+	std::chrono::nanoseconds PTS() const;
+	std::chrono::nanoseconds DTS() const;
+	std::chrono::nanoseconds Duration() const;
 
 private:
 	GstVideoFrame *d_frame;

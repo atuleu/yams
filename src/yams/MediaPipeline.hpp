@@ -15,8 +15,9 @@ class MediaPipeline : public Pipeline {
 	Q_OBJECT
 public:
 	struct Args {
-		size_t ID   = 0;
-		QSize  Size = {1920, 1080};
+		size_t LayerID = 0;
+		size_t SinkID  = 0;
+		QSize  Size    = {1920, 1080};
 		qreal  FPS  = 60.0;
 	};
 
@@ -35,22 +36,24 @@ signals:
 	void Error();
 
 public slots:
-	void play(const MediaPlayInfo &infos, std::chrono::nanoseconds offset);
+	void play(const MediaPlayInfo &infos);
+	void stop();
 
 protected:
+	void forceDownstreamEOS();
+
 	void onEOS();
 	void onError();
 	void reset();
 
-	void playFile(const MediaPlayInfo &infos, std::chrono::nanoseconds offset);
-	void playTest(const MediaPlayInfo &infos, std::chrono::nanoseconds offset);
-	void setOffset(std::chrono::nanoseconds offset);
+	void playFile(const MediaPlayInfo &infos);
+	void playTest(const MediaPlayInfo &infos);
 
 	void onMessage(GstMessage *msg) noexcept override;
 
 	slog::Logger<1> d_logger;
 	GstElementPtr   d_fileSource, d_decodeBin, d_decodeCapsfilter, d_testSource,
-	    d_testCapsfilter, d_timeOverlay, d_tsOffset, d_proxySink;
+	    d_testCapsfilter, d_timeOverlay, d_queue, d_proxySink;
 
 	uint64_t d_framerateNum, d_framerateDenum;
 

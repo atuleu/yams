@@ -5,13 +5,18 @@
 #include <cpptrace/cpptrace.hpp>
 
 namespace yams {
+template <typename... Attributes>
 inline GstElementPtr
-GstElementFactoryMake(const char *factory, const char *name) {
-	auto res = gst_element_factory_make(factory, name);
+GstElementFactoryMakeFull(const char *factory, Attributes &&...attrs) {
+	auto res = gst_element_factory_make_full(
+	    factory,
+	    std::forward<Attributes>(attrs)...,
+	    nullptr
+	);
 	if (res == nullptr) {
 		throw cpptrace::runtime_error{
-		    "could not make element: gst_element_factory_make('" +
-		    std::string(factory) + "','" + std::string{name} + "')"
+		    "could not make element: gst_element_factory_make_full('" +
+		    std::string(factory) + "')"
 		};
 	}
 	return GstElementPtr{res};

@@ -8,6 +8,7 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <chrono>
 #include <glib.h>
 #include <gst/gl/gl.h>
 #include <gst/gl/gstglcontext.h>
@@ -32,6 +33,36 @@
 namespace yams {
 
 void VideoOutput::pushNewFrame(yams::Frame::Ptr frame) {
+	using clock = std::chrono::steady_clock;
+
+	static clock::time_point        last;
+	static bool                     once = false;
+	static int                      i    = 0;
+	static std::chrono::nanoseconds delta{0}, max{0}, min{1s};
+
+	auto now = clock::now();
+
+	if (once) {
+		delta = now - last;
+		min   = std::min(min, delta);
+		max   = std::max(max, delta);
+	}
+	last = now;
+	once = true;
+	if (++i % 60 == 0) {
+		slog::Info(
+		    "pushed",
+		    slog::Int("i", i),
+		    slog::Duration("PTS", frame->PTS()),
+		    slog::Duration("DTS", frame->DTS()),
+		    slog::Duration("duration", frame->Duration()),
+		    slog::Duration("delta", delta),
+		    slog::Duration("delta_min", min),
+		    slog::Duration("delta_max", max)
+		);
+		max = std::chrono::nanoseconds{0};
+		min = std::chrono::nanoseconds{1s};
+	}
 	d_frame = frame;
 	update();
 }

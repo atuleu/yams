@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <glib-object.h>
+#include <gst/gstcaps.h>
 #include <gst/gstclock.h>
 #include <gst/gstelement.h>
 #include <gst/gstmessage.h>
@@ -21,7 +22,7 @@
 namespace yams {
 
 MediaPipeline::MediaPipeline(Args args, Compositor *parent)
-    : Pipeline{("media" + std::to_string(args.ID)).c_str(), (QObject *)parent}
+    : Pipeline{("media" + std::to_string(args.LayerID) + "_"+std::to_string(args.SinkID)).c_str(), (QObject *)parent}
     , d_logger{slog::With(slog::String(
           "pipeline", (const char *)GST_OBJECT_NAME(d_pipeline.get())
       ))} {
@@ -29,21 +30,10 @@ MediaPipeline::MediaPipeline(Args args, Compositor *parent)
 	auto clock = GstClockPtr{gst_system_clock_obtain()};
 	gst_pipeline_use_clock(GST_PIPELINE(d_pipeline.get()), clock.get());
 
-	d_fileSource = GstElementFactoryMake("filesrc", "file0");
-
-	d_testSource     = GstElementFactoryMake("videotestsrc", "test0");
-	d_testCapsfilter = GstElementFactoryMake("capsfilter", "testCaps0");
-	d_timeOverlay    = GstElementFactoryMake("timeoverlay", "timeoverlay0");
-
-	d_proxySink        = GstElementFactoryMake("proxysink", "sink0");
-	d_decodeBin        = GstElementFactoryMake("decodebin", "decode0");
-	d_decodeCapsfilter = GstElementFactoryMake("capsfilter", "decodeCaps0");
-
-	d_tsOffset = GstElementFactoryMake("identity", "offseter0");
-
 	auto [num, denum] = yams::build_fraction(args.FPS);
 	d_framerateNum    = num;
 	d_framerateDenum  = denum;
+
 	// clang-format off
 	auto testCaps = gst_caps_new_simple(
 	    "video/x-raw", //
@@ -56,6 +46,9 @@ MediaPipeline::MediaPipeline(Args args, Compositor *parent)
 	if (testCaps == nullptr) {
 		throw cpptrace::logic_error{"invalid videotestsrc caps"};
 	}
+	defer {
+		gst_caps_unref(testCaps);
+	};
 
 	auto decodeCaps = gst_caps_new_simple(
 	    "video/x-raw",
@@ -68,15 +61,38 @@ MediaPipeline::MediaPipeline(Args args, Compositor *parent)
 		throw cpptrace::logic_error{"invalid decode caps"};
 	}
 
-	g_object_set(G_OBJECT(d_testCapsfilter.get()), "caps", testCaps, nullptr);
+	d_fileSource = GstElementFactoryMakeFull("filesrc", "name", "file0");
+
+	d_testSource = GstElementFactoryMakeFull("videotestsrc", "name", "test0");
+	d_testCapsfilter = GstElementFactoryMakeFull(
+	    "capsfilter",
+	    "name",
+	    "testCaps0",
+	    "caps",
+	    testCaps
+	);
+	d_timeOverlay =
+	    GstElementFactoryMakeFull("timeoverlay", "name", "timeoverlay0");
+	d_proxySink = GstElementFactoryMakeFull("proxysink", "name", "sink0");
+	d_decodeBin = GstElementFactoryMakeFull("decodebin", "name", "decode0");
+	d_decodeCapsfilter = GstElementFactoryMakeFull(
+	    "capsfilter",
+	    "name",
+	    "decodeCaps0",
+	    "caps",
+	    decodeCaps
+	);
+
+	d_queue =
+	    GstElementFactoryMakeFull("identity", "name", "queue0", "silent", true);
 
 	gst_bin_add_many(
 	    GST_BIN(d_pipeline.get()),
-	    g_object_ref(d_tsOffset.get()),
+	    g_object_ref(d_queue.get()),
 	    g_object_ref(d_proxySink.get()),
 	    nullptr
 	);
-	if (gst_element_link_many(d_tsOffset.get(), d_proxySink.get(), nullptr) ==
+	if (gst_element_link_many(d_queue.get(), d_proxySink.get(), nullptr) ==
 	    false) {
 		throw cpptrace::runtime_error("could not link final element");
 	}
@@ -90,9 +106,7 @@ GstElement *MediaPipeline::proxySink() {
 	return d_proxySink.get();
 }
 
-void MediaPipeline::play(
-    const MediaPlayInfo &infos, std::chrono::nanoseconds offset
-) {
+void MediaPipeline::play(const MediaPlayInfo &infos) {
 	if (d_playing == true) {
 		d_logger.Error("already playing");
 		return;
@@ -101,10 +115,10 @@ void MediaPipeline::play(
 	switch (infos.MediaType) {
 	case MediaPlayInfo::Type::IMAGE:
 	case MediaPlayInfo::Type::VIDEO:
-		playFile(infos, offset);
+		playFile(infos);
 		break;
 	case MediaPlayInfo::Type::TEST:
-		playTest(infos, offset);
+		playTest(infos);
 		break;
 	}
 }
@@ -152,15 +166,28 @@ void MediaPipeline::onMessage(GstMessage *msg) noexcept {
 	}
 }
 
+void MediaPipeline::stop() {
+	if (d_playing == true) {
+		forceDownstreamEOS();
+	}
+	onEOS();
+}
+
 void MediaPipeline::onEOS() {
+	emit EOS();
 	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
+}
+
+void MediaPipeline::forceDownstreamEOS() {
+	GstEvent *eosEvent = gst_event_new_eos();
+	gst_element_send_event(d_proxySink.get(), eosEvent);
 }
 
 void MediaPipeline::onError() {
 	// send EOS event on proxySink
-	GstEvent *eosEvent = gst_event_new_eos();
-	gst_element_send_event(d_proxySink.get(), eosEvent);
-	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
+	forceDownstreamEOS();
+	emit Error();
+	onEOS();
 }
 
 void MediaPipeline::reset() {
@@ -172,7 +199,7 @@ void MediaPipeline::reset() {
 			    d_fileSource.get(),
 			    d_decodeBin.get(),
 			    d_decodeCapsfilter.get(),
-			    d_tsOffset.get(),
+			    d_queue.get(),
 			    nullptr
 			);
 			gst_bin_remove_many(
@@ -188,7 +215,7 @@ void MediaPipeline::reset() {
 			    d_testSource.get(),
 			    d_testCapsfilter.get(),
 			    d_timeOverlay.get(),
-			    d_tsOffset.get(),
+			    d_queue.get(),
 			    nullptr
 			);
 			gst_bin_remove_many(
@@ -201,14 +228,12 @@ void MediaPipeline::reset() {
 			break;
 		}
 	}
-	setOffset(std::chrono::nanoseconds{0});
+
 	d_playing      = false;
 	d_currentMedia = std::nullopt;
 }
 
-void MediaPipeline::playFile(
-    const MediaPlayInfo &infos, std::chrono::nanoseconds offset
-) {
+void MediaPipeline::playFile(const MediaPlayInfo &infos) {
 	g_object_set(
 	    d_fileSource.get(),
 	    "location",
@@ -227,7 +252,7 @@ void MediaPipeline::playFile(
 	        d_fileSource.get(),
 	        d_decodeBin.get(),
 	        d_decodeCapsfilter.get(),
-	        d_tsOffset.get(),
+	        d_queue.get(),
 	        nullptr
 	    ) == false) {
 		d_logger.Error("could not link file pipeline");
@@ -240,15 +265,12 @@ void MediaPipeline::playFile(
 		);
 		return;
 	}
-	setOffset(offset);
 	gst_element_set_state(d_pipeline.get(), GST_STATE_PLAYING);
 	d_playing      = true;
 	d_currentMedia = infos.MediaType;
 }
 
-void MediaPipeline::playTest(
-    const MediaPlayInfo &infos, std::chrono::nanoseconds offset
-) {
+void MediaPipeline::playTest(const MediaPlayInfo &infos) {
 	static std::map<std::string, int> patternByName = {
 	    {"smpte", 0},              // SMPTE 100%% color bars
 	    {"snow", 1},               // Random (television snow)
@@ -320,7 +342,7 @@ void MediaPipeline::playTest(
 	        d_testSource.get(),
 	        d_testCapsfilter.get(),
 	        d_timeOverlay.get(),
-	        d_tsOffset.get(),
+	        d_queue.get(),
 	        nullptr
 	    ) == false) {
 		d_logger.Error("could not link test pipeline");
@@ -334,24 +356,9 @@ void MediaPipeline::playTest(
 		return;
 	}
 
-	setOffset(offset);
 	gst_element_set_state(d_pipeline.get(), GST_STATE_PLAYING);
 	d_playing      = true;
 	d_currentMedia = MediaPlayInfo::Type::TEST;
-}
-
-void MediaPipeline::setOffset(std::chrono::nanoseconds offset) {
-	return;
-	g_object_set(
-	    d_tsOffset.get(),
-	    "silent",
-	    true, // pass through buffers
-	    "ts-offset",
-	    -offset.count(),
-	    "sync",
-	    true,
-	    nullptr
-	);
 }
 
 } // namespace yams
