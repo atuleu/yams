@@ -5,15 +5,13 @@
 
 #include <chrono>
 
-#include <gst/gstclock.h>
-#include <gst/gstelementfactory.h>
-#include <gst/gstevent.h>
-#include <gst/gstformat.h>
-#include <gst/gstpad.h>
-#include <gst/gstpipeline.h>
+#include <QTimer>
 #include <memory>
 #include <qmetaobject.h>
 #include <qnamespace.h>
+#include <qobjectdefs.h>
+#include <qtypes.h>
+
 #include <slog++/slog++.hpp>
 
 #include <cpptrace/exceptions.hpp>
@@ -29,9 +27,15 @@
 #include <gst/gstbus.h>
 #include <gst/gstcaps.h>
 #include <gst/gstcapsfeatures.h>
+#include <gst/gstclock.h>
 #include <gst/gstelement.h>
+#include <gst/gstelementfactory.h>
+#include <gst/gstevent.h>
+#include <gst/gstformat.h>
 #include <gst/gstmessage.h>
 #include <gst/gstobject.h>
+#include <gst/gstpad.h>
+#include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
 #include <gst/gstvalue.h>
 
@@ -135,6 +139,7 @@ void Compositor::InputData::playMedia(
 	    "width", layer.compositor.d_size.width(),
 	    "height", layer.compositor.d_size.height(),
 	    "sizing-policy", 1,
+		"repeat-after-eos", true,
 	    nullptr
 	);
 	// clang-format on
@@ -143,6 +148,14 @@ void Compositor::InputData::playMedia(
 	    sink.get(),
 	    GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
 	    (GstPadProbeCallback)&Compositor::onSinkEventProbe,
+	    this,
+	    nullptr
+	);
+
+	gst_pad_add_probe(
+	    sink.get(),
+	    GST_PAD_PROBE_TYPE_BUFFER,
+	    (GstPadProbeCallback)&Compositor::onBufferProbe,
 	    this,
 	    nullptr
 	);
@@ -179,20 +192,26 @@ Compositor::Compositor(Options options, Args args)
 	d_clock = GstClockPtr{gst_system_clock_obtain()};
 	gst_pipeline_use_clock(GST_PIPELINE(d_pipeline.get()), d_clock.get());
 
+	auto [num, denum] = yams::build_fraction(options.FPS);
+
+	d_logger.Info(
+	    "output settings",
+	    slog::String(
+	        "framerate",
+	        std::to_string(num) + "/" + std::to_string(denum)
+	    ),
+	    slog::QSize("size", options.Size)
+	);
+
 	// clang-format off
 	auto blacksourceCaps = gst_caps_new_simple(
 	    "video/x-raw",
-	    "framerate", GST_TYPE_FRACTION, 1, 1,
+	    "framerate", GST_TYPE_FRACTION, num, denum,
 	    "width", G_TYPE_INT, 16,
 	    "height", G_TYPE_INT, 16,
 	    nullptr
 	);
 
-	auto [num,denum] = yams::build_fraction(options.FPS);
-
-	d_logger.Info("output settings",
-				  slog::String("framerate",std::to_string(num) + "/" + std::to_string(denum)),
-				  slog::QSize("size",options.Size));
 
 	auto compositorCaps = gst_caps_new_simple(
 	    "video/x-raw",
@@ -231,14 +250,16 @@ Compositor::Compositor(Options options, Args args)
 	    "caps", blacksourceCaps
 	);
 
-	d_playAdditionnalLatency = 400ms;
+	d_playAdditionnalLatency = 100ms;
 	d_videoMixer = GstElementFactoryMakeFull(
 	    "glvideomixer",
 	    "name", "vmix",
-		"async-handling", false,
-	    "force-live", true,
+	    "async-handling", true,
+		"message-forward", true,
+	    "force-live", false,
 	    "background", 1,
-	    "latency", 400ms
+	    "min-upstream-latency", d_playAdditionnalLatency.count(),
+	    "latency", std::chrono::nanoseconds{400ms}.count()
 	);
 
 	auto compositorCapsfilter = GstElementFactoryMakeFull(
@@ -307,7 +328,7 @@ void Compositor::play(const MediaPlayInfo &media, int layer) {
 	    Qt::QueuedConnection,
 	    media,
 	    layer,
-	    runningTime
+	    runningTime + d_playAdditionnalLatency
 	);
 }
 
@@ -339,11 +360,28 @@ GstPadProbeReturn Compositor::onSinkEventProbe(
 	}
 
 	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
+	return GST_PAD_PROBE_OK;
 	QMetaObject::invokeMethod(
 	    &input->layer.compositor,
 	    &Compositor::removeMedia,
 	    Qt::QueuedConnection,
 	    input
+	);
+	return GST_PAD_PROBE_OK;
+}
+
+GstPadProbeReturn Compositor::onBufferProbe(
+    GstPad *pad, GstPadProbeInfo *info, InputData *input
+) {
+	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
+	auto &compositor = input->layer.compositor;
+	QMetaObject::invokeMethod(
+	    &compositor,
+	    &Compositor::reportTimeToFirstBuffer,
+	    Qt::QueuedConnection,
+	    gst_element_get_current_running_time(compositor.d_pipeline.get()),
+	    GST_BUFFER_PTS(GST_PAD_PROBE_INFO_BUFFER(info)),
+	    input->offset.count()
 	);
 	return GST_PAD_PROBE_OK;
 }
@@ -548,6 +586,18 @@ void Compositor::buildLayers(const Options &opts) {
 	for (size_t i = 0; i < opts.Layers; ++i) {
 		d_layers.emplace_back(std::make_unique<LayerData>(*this, i, opts));
 	}
+}
+
+void Compositor::reportTimeToFirstBuffer(
+    qint64 runningTime, qint64 PTS, qint64 start
+) {
+	d_logger.Info(
+	    "time to first buffer",
+	    slog::Duration("start", std::chrono::nanoseconds{start}),
+	    slog::Duration("PTS", std::chrono::nanoseconds{PTS}),
+	    slog::Duration("running_time", std::chrono::nanoseconds{runningTime}),
+	    slog::Duration("delay", std::chrono::nanoseconds{runningTime - start})
+	);
 }
 
 } // namespace yams

@@ -11,6 +11,7 @@
 #include <gst/gstmemory.h>
 #include <gst/gstpad.h>
 
+#include <qtypes.h>
 #include <slog++/Logger.hpp>
 
 #include "Frame.hpp"
@@ -55,6 +56,7 @@ private slots:
 	);
 
 	void removeMedia(InputData *layer);
+	void reportTimeToFirstBuffer(qint64 runningTime, qint64 PTS, qint64 start);
 signals:
 	void newFrame(yams::Frame::Ptr frame);
 	void outputSizeChanged(QSize size);
@@ -65,6 +67,10 @@ protected:
 
 private:
 	static GstPadProbeReturn onSinkEventProbe(
+	    GstPad *pad, GstPadProbeInfo *info, Compositor::InputData *layer
+	);
+
+	static GstPadProbeReturn onBufferProbe(
 	    GstPad *pad, GstPadProbeInfo *info, Compositor::InputData *layer
 	);
 
