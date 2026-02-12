@@ -24,6 +24,7 @@ using namespace std::chrono_literals;
 
 class Compositor : public yams::Pipeline {
 	struct LayerData;
+	struct SinkData;
 	Q_OBJECT
 public:
 	struct Options {
@@ -53,7 +54,7 @@ private slots:
 	    const MediaPlayInfo &media, int layer, std::chrono::nanoseconds from
 	);
 
-	void removeMedia(LayerData *layer);
+	void removeMedia(SinkData *layer);
 signals:
 	void newFrame(yams::Frame::Ptr frame);
 	void outputSizeChanged(QSize size);
@@ -64,11 +65,11 @@ protected:
 
 private:
 	static GstPadProbeReturn onSinkEventProbe(
-	    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
+	    GstPad *pad, GstPadProbeInfo *info, Compositor::SinkData *layer
 	);
 
 	static GstPadProbeReturn onBufferProbe(
-	    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
+	    GstPad *pad, GstPadProbeInfo *info, Compositor::SinkData *layer
 	);
 
 	static GstFlowReturn onNewSampleCb(GstElement *appsink, Compositor *self);

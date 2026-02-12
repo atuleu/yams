@@ -341,6 +341,7 @@ void MediaPipeline::playTest(
 }
 
 void MediaPipeline::setOffset(std::chrono::nanoseconds offset) {
+	return;
 	g_object_set(
 	    d_tsOffset.get(),
 	    "silent",

@@ -9,6 +9,7 @@
 #include <gst/gstformat.h>
 #include <gst/gstpad.h>
 #include <gst/gstpipeline.h>
+#include <memory>
 #include <qmetaobject.h>
 #include <qnamespace.h>
 #include <slog++/slog++.hpp>
@@ -40,14 +41,57 @@
 
 namespace yams {
 
-struct Compositor::LayerData {
-	Compositor              *self;
+struct Compositor::SinkData {
+	Compositor::LayerData   &layer;
 	MediaPipeline           *pipeline;
-	GstElementPtr            proxy;
+	GstElementPtr            proxysrc;
 	GstPadPtr                src, sink;
 	std::chrono::nanoseconds offset;
-	GstEventPtr              segmentEvent;
+
+	SinkData(Compositor::LayerData &layer, int layerID, int ID);
 };
+
+struct Compositor::LayerData {
+	Compositor               &compositor;
+	std::unique_ptr<SinkData> sinks[2];
+
+	LayerData(Compositor &parent, int layerID)
+	    : compositor{parent}
+	    , sinks{
+	          std::make_unique<SinkData>(*this, layerID, 0),
+	          std::make_unique<SinkData>(*this, layerID, 1)
+	      } {}
+};
+
+Compositor::SinkData::SinkData(
+    Compositor::LayerData &layer,
+    int                    layerID,
+    int                    ID,
+    const QSize           &size,
+    qreal                  FPS
+) {
+	proxysrc = GstElementFactoryMake(
+	    "proxysrc",
+	    (std::to_string(layerID) + "-" + std::to_string(ID)).c_str()
+	);
+	auto compositor = &layer.compositor;
+
+	gst_bin_add(
+	    GST_BIN(compositor->d_pipeline.get()),
+	    g_object_ref(proxysrc.get())
+	);
+	pipeline = new MediaPipeline{
+	    {.ID = size_t(layerID * 2 + ID), .Size = size, .FPS = FPS},
+	    compositor
+	};
+
+	g_object_set(proxysrc.get(), "proxysink", pipeline->proxySink(), nullptr);
+	src.reset(gst_element_get_static_pad(proxysrc.get(), "src"));
+	if (src == nullptr) {
+		delete pipeline;
+		throw cpptrace::runtime_error{"could not found src pad on sink"};
+	}
+}
 
 void Compositor::stop() {
 	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
@@ -239,32 +283,16 @@ slog::Attribute slogGstSegment(const char *name, const GstSegment &segment) {
 }
 
 GstPadProbeReturn Compositor::onSinkEventProbe(
-    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
+    GstPad *pad, GstPadProbeInfo *info, Compositor::SinkData *layer
 ) {
 	auto event = GST_PAD_PROBE_INFO_EVENT(info);
 	if (event == nullptr) {
 		return GST_PAD_PROBE_OK;
 	}
-	auto logger = layer->self->d_logger;
-	if (GST_EVENT_TYPE(event) == GST_EVENT_SEGMENT) {
-		if (layer->segmentEvent == nullptr) {
-			return GST_PAD_PROBE_OK;
-		}
-		const GstSegment *orig, *newSegment;
-		gst_event_parse_segment(event, &orig);
-		gst_event_parse_segment(layer->segmentEvent.get(), &newSegment);
-		layer->self->d_logger.Info(
-		    "replacing event",
-		    slogGstSegment("orig", *orig),
-		    slogGstSegment("new", *newSegment)
-		);
-
-		// gst_pad_send_event(pad, layer->segmentEvent.release());
-		return GST_PAD_PROBE_OK;
-	}
 	if (GST_EVENT_TYPE(event) != GST_EVENT_EOS) {
 		return GST_PAD_PROBE_OK;
 	}
+
 	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
 	QMetaObject::invokeMethod(
 	    layer->self,
@@ -276,7 +304,7 @@ GstPadProbeReturn Compositor::onSinkEventProbe(
 }
 
 GstPadProbeReturn Compositor::onBufferProbe(
-    GstPad *pad, GstPadProbeInfo *info, Compositor::LayerData *layer
+    GstPad *pad, GstPadProbeInfo *info, Compositor::SinkData *layer
 ) {
 	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
 	auto pipeline = layer->self->d_pipeline.get();
@@ -307,14 +335,14 @@ void Compositor::playUnsafe(
 	auto layer = d_layers[layerIndex].get();
 
 	g_object_set(
-	    layer->proxy.get(),
+	    layer->proxysrc.get(),
 	    "proxysink",
 	    layer->pipeline->proxySink(),
 	    nullptr
 	);
 
 	if (gst_element_link_many(
-	        layer->proxy.get(),
+	        layer->proxysrc.get(),
 	        d_compositor.get(),
 	        nullptr
 	    ) == false) {
@@ -323,17 +351,21 @@ void Compositor::playUnsafe(
 		return;
 	}
 
-	layer->src.reset(gst_element_get_static_pad(layer->proxy.get(), "src"));
+	layer->src.reset(gst_element_get_static_pad(layer->proxysrc.get(), "src"));
 	if (layer->src == nullptr) {
 		d_logger.Error("could not find the src pad?");
 		return;
 	}
+
+	// offset all time going from that pad, before doing anything
+	gst_pad_set_offset(layer->src.get(), from.count());
 
 	layer->sink.reset(gst_pad_get_peer(layer->src.get()));
 	if (layer->sink == nullptr) {
 		d_logger.Error("could not find sink pad on compositor");
 		return;
 	}
+
 	g_object_set(
 	    layer->sink.get(),
 	    "width",
@@ -344,13 +376,7 @@ void Compositor::playUnsafe(
 	    1,
 	    nullptr
 	);
-	GstSegment segment;
-	gst_segment_init(&segment, GST_FORMAT_TIME);
-	segment.offset = -from.count();
-	segment.start  = 0;
-	segment.stop   = GST_CLOCK_TIME_NONE;
-	segment.rate   = 1.0;
-	layer->segmentEvent.reset(gst_event_new_segment(&segment));
+
 	layer->offset = from;
 	gst_pad_add_probe(
 	    layer->sink.get(),
@@ -373,10 +399,11 @@ void Compositor::playUnsafe(
 	    slog::String("media", media.Location.toStdString()),
 	    slog::Duration("offset", from)
 	);
+
 	layer->pipeline->play(media, from);
 }
 
-void Compositor::removeMedia(LayerData *layer) {
+void Compositor::removeMedia(SinkData *layer) {
 	if (gst_pad_unlink(layer->src.get(), layer->sink.get()) == false) {
 		d_logger.Error(
 		    "could not unlink pads",
@@ -574,10 +601,10 @@ void Compositor::buildLayers(const Options &opts) {
 
 		gst_bin_add(GST_BIN(d_pipeline.get()), g_object_ref(proxySrc.get()));
 
-		d_layers.emplace_back(new LayerData{
+		d_layers.emplace_back(new SinkData{
 		    .self     = this,
 		    .pipeline = pipeline,
-		    .proxy    = std::move(proxySrc)
+		    .proxysrc = std::move(proxySrc)
 		});
 	}
 }
