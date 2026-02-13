@@ -83,8 +83,7 @@ MediaPipeline::MediaPipeline(Args args, Compositor *parent)
 	    decodeCaps
 	);
 
-	d_queue =
-	    GstElementFactoryMakeFull("identity", "name", "queue0", "silent", true);
+	d_queue = GstElementFactoryMakeFull("queue", "name", "queue0");
 
 	gst_bin_add_many(
 	    GST_BIN(d_pipeline.get()),

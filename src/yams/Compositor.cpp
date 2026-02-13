@@ -12,6 +12,7 @@
 #include <qobjectdefs.h>
 #include <qtypes.h>
 
+#include <slog++/Types.hpp>
 #include <slog++/slog++.hpp>
 
 #include <cpptrace/exceptions.hpp>
@@ -240,8 +241,8 @@ Compositor::Compositor(Options options, Args args)
 	d_blacksrc = GstElementFactoryMakeFull(
 	    "videotestsrc",
 	    "name", "blacksrc0",
-		"is-live", false,
-		"do-timestamp", true,
+		//"is-live", true,
+		//"do-timestamp", false,
 	    "pattern", 2
 	);
 	auto blackSourceCapsfilter = GstElementFactoryMakeFull(
@@ -256,9 +257,10 @@ Compositor::Compositor(Options options, Args args)
 	    "name", "vmix",
 	    "async-handling", true,
 		"message-forward", true,
-	    "force-live", false,
+	    "force-live", true,
+		"start-time-selection", 0,
 	    "background", 1,
-	    "min-upstream-latency", d_playAdditionnalLatency.count(),
+	    "min-upstream-latency", std::chrono::nanoseconds{400ms}.count(),
 	    "latency", std::chrono::nanoseconds{400ms}.count()
 	);
 
@@ -316,10 +318,22 @@ void Compositor::start() {
 
 void Compositor::play(const MediaPlayInfo &media, int layer) {
 	auto runningTime = std::chrono::nanoseconds{
-	    gst_element_get_current_running_time(d_pipeline.get())
+	    gst_element_get_current_running_time(d_videoMixer.get())
 	};
+	auto pad = GstPadPtr{gst_element_get_static_pad(d_videoMixer.get(), "src")};
+	gint64 position{-1};
+	gst_pad_query_position(pad.get(), GST_FORMAT_TIME, &position);
+	auto offset = std::chrono::nanoseconds{position};
+	d_logger.Info(
+	    "playing",
+	    slog::Duration("running_time", runningTime),
+	    slog::Duration("output_time", offset),
+	    slog::Duration("diff", runningTime - offset)
+	);
+	// offset = runningTime;
+	//  d_playAdditionnalLatency = runningTime - offset + 100ms;
 	if (QThread::currentThread() == this->thread()) {
-		this->playUnsafe(media, layer, runningTime + d_playAdditionnalLatency);
+		this->playUnsafe(media, layer, offset + d_playAdditionnalLatency);
 		return;
 	}
 	QMetaObject::invokeMethod(
@@ -328,7 +342,7 @@ void Compositor::play(const MediaPlayInfo &media, int layer) {
 	    Qt::QueuedConnection,
 	    media,
 	    layer,
-	    runningTime + d_playAdditionnalLatency
+	    offset + d_playAdditionnalLatency
 	);
 }
 
@@ -360,7 +374,6 @@ GstPadProbeReturn Compositor::onSinkEventProbe(
 	}
 
 	gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
-	return GST_PAD_PROBE_OK;
 	QMetaObject::invokeMethod(
 	    &input->layer.compositor,
 	    &Compositor::removeMedia,
