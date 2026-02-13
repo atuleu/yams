@@ -140,7 +140,7 @@ void Compositor::InputData::playMedia(
 	    "width", layer.compositor.d_size.width(),
 	    "height", layer.compositor.d_size.height(),
 	    "sizing-policy", 1,
-		"repeat-after-eos", true,
+		"repeat-after-eos", false,
 	    nullptr
 	);
 	// clang-format on
@@ -241,8 +241,8 @@ Compositor::Compositor(Options options, Args args)
 	d_blacksrc = GstElementFactoryMakeFull(
 	    "videotestsrc",
 	    "name", "blacksrc0",
-		//"is-live", true,
-		//"do-timestamp", false,
+		"is-live", true,
+		"do-timestamp", true,
 	    "pattern", 2
 	);
 	auto blackSourceCapsfilter = GstElementFactoryMakeFull(
@@ -251,17 +251,14 @@ Compositor::Compositor(Options options, Args args)
 	    "caps", blacksourceCaps
 	);
 
-	d_playAdditionnalLatency = 100ms;
+	d_playAdditionnalLatency = 0ms;
 	d_videoMixer = GstElementFactoryMakeFull(
 	    "glvideomixer",
 	    "name", "vmix",
-	    "async-handling", true,
-		"message-forward", true,
 	    "force-live", true,
-		"start-time-selection", 0,
 	    "background", 1,
-	    "min-upstream-latency", std::chrono::nanoseconds{400ms}.count(),
-	    "latency", std::chrono::nanoseconds{400ms}.count()
+	    "min-upstream-latency", std::chrono::nanoseconds{0ms}.count(),
+	    "latency", std::chrono::nanoseconds{100ms}.count()
 	);
 
 	auto compositorCapsfilter = GstElementFactoryMakeFull(
@@ -305,6 +302,9 @@ Compositor::Compositor(Options options, Args args)
 		throw cpptrace::runtime_error{"could not link pipeline elements"};
 	}
 
+	d_videoMixerSrc =
+	    GstPadPtr{gst_element_get_static_pad(d_videoMixer.get(), "src")};
+
 	buildLayers(options);
 }
 
@@ -317,13 +317,8 @@ void Compositor::start() {
 }
 
 void Compositor::play(const MediaPlayInfo &media, int layer) {
-	auto runningTime = std::chrono::nanoseconds{
-	    gst_element_get_current_running_time(d_videoMixer.get())
-	};
-	auto pad = GstPadPtr{gst_element_get_static_pad(d_videoMixer.get(), "src")};
-	gint64 position{-1};
-	gst_pad_query_position(pad.get(), GST_FORMAT_TIME, &position);
-	auto offset = std::chrono::nanoseconds{position};
+	auto runningTime = this->runningTime();
+	auto offset      = outputTime();
 	d_logger.Info(
 	    "playing",
 	    slog::Duration("running_time", runningTime),
@@ -411,6 +406,18 @@ void Compositor::playUnsafe(
 	layer->inputs[0].playMedia(media, from);
 }
 
+std::chrono::nanoseconds Compositor::runningTime() {
+	return std::chrono::nanoseconds{
+	    gst_element_get_current_running_time(d_pipeline.get())
+	};
+}
+
+std::chrono::nanoseconds Compositor::outputTime() {
+	gint64 pos;
+	gst_pad_query_position(d_videoMixerSrc.get(), GST_FORMAT_TIME, &pos);
+	return std::chrono::nanoseconds{pos};
+}
+
 void Compositor::removeMedia(InputData *input) {
 	input->d_logger.Info("clearing pipeline");
 	if (gst_pad_unlink(input->src.get(), input->sink.get()) == false) {
@@ -427,7 +434,21 @@ void Compositor::removeMedia(InputData *input) {
 		);
 		return;
 	}
-	gst_element_release_request_pad(d_videoMixer.get(), input->sink.get());
+
+	QTimer::singleShot(
+	    2 * std::chrono::duration_cast<std::chrono::milliseconds>(
+	            runningTime() - outputTime()
+	        )
+	            .count(),
+	    [this, sink = input->sink.release()]() {
+		    d_logger.Info(
+		        "removing videomixer sink",
+		        slog::String("name", (const char *)GST_OBJECT_NAME(sink))
+		    );
+		    gst_element_release_request_pad(d_videoMixer.get(), sink);
+	    }
+	);
+
 	input->sink.reset();
 }
 

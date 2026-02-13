@@ -78,6 +78,9 @@ private:
 
 	void buildLayers(const Options &options);
 
+	std::chrono::nanoseconds runningTime();
+	std::chrono::nanoseconds outputTime();
+
 	slog::Logger<1> d_logger;
 
 	std::chrono::nanoseconds d_playAdditionnalLatency{0};
@@ -88,6 +91,7 @@ private:
 	std::optional<GstVideoInfo> d_infos;
 
 	GstElementPtr d_blacksrc, d_videoMixer;
+	GstPadPtr     d_videoMixerSrc;
 
 	using FramePool = ObjectPool<Frame>;
 	FramePool::Ptr d_pool;

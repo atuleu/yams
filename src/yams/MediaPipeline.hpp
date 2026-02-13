@@ -18,7 +18,7 @@ public:
 		size_t LayerID = 0;
 		size_t SinkID  = 0;
 		QSize  Size    = {1920, 1080};
-		qreal  FPS  = 60.0;
+		qreal  FPS     = 60.0;
 	};
 
 	MediaPipeline(Args args, Compositor *parent);
