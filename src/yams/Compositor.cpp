@@ -7,6 +7,7 @@
 
 #include <QTimer>
 #include <memory>
+#include <optional>
 #include <qmetaobject.h>
 #include <qnamespace.h>
 #include <qobjectdefs.h>
@@ -49,27 +50,32 @@
 namespace yams {
 
 struct Compositor::InputData {
+	size_t                   ID;
 	LayerData               &layer;
-	slog::Logger<3>          d_logger;
+	slog::Logger<3>          logger;
 	MediaPipeline           *pipeline;
 	GstElementPtr            proxysrc;
 	GstPadPtr                src, sink;
 	std::chrono::nanoseconds offset;
 
+	InputData &next() const;
+	bool       scheduled() const;
+
 	void
 	playMedia(const MediaPlayInfo &, std::chrono::nanoseconds atRunningTime);
 
 	InputData(
-	    LayerData &layer, size_t layerID, size_t sinkID, const Options &options
+	    LayerData &layer, size_t layerID, size_t inputID, const Options &options
 	);
 };
 
 struct Compositor::LayerData {
 	Compositor     &compositor;
-	slog::Logger<2> d_logger;
+	slog::Logger<2> logger;
 	InputData       inputs[2];
 	size_t          next{0};
-	bool            playing{false};
+
+	std::optional<MediaPlayInfo> media;
 
 	InputData &nextSink() {
 		return inputs[next % 2];
@@ -77,7 +83,7 @@ struct Compositor::LayerData {
 
 	LayerData(Compositor &parent, size_t layerID, const Options &opts)
 	    : compositor{parent}
-	    , d_logger{parent.d_logger.With(slog::Int("layer", layerID))}
+	    , logger{parent.d_logger.With(slog::Int("layer", layerID))}
 	    , inputs{{*this, layerID, 0, opts}, {*this, layerID, 1, opts}} {}
 };
 
@@ -85,7 +91,8 @@ Compositor::InputData::InputData(
     LayerData &parent, size_t layerID, size_t inputID, const Options &opts
 )
     : layer{parent}
-    , d_logger{parent.d_logger.With(slog::Int("input", inputID))} {
+    , ID{inputID}
+    , logger{parent.logger.With(slog::Int("input", inputID))} {
 	proxysrc = GstElementFactoryMakeFull(
 	    "proxysrc",
 	    "name",
@@ -125,13 +132,13 @@ void Compositor::InputData::playMedia(
 	        layer.compositor.d_videoMixer.get(),
 	        nullptr
 	    ) == false) {
-		d_logger.Error("could not link proxysink to videomixer");
+		logger.Error("could not link proxysink to videomixer");
 		return;
 	}
 
 	sink.reset(gst_pad_get_peer(src.get()));
 	if (sink == nullptr) {
-		d_logger.Error("could not find sink pad on compositor");
+		logger.Error("could not find sink pad on compositor");
 		return;
 	}
 	// clang-format off
@@ -161,13 +168,25 @@ void Compositor::InputData::playMedia(
 	    nullptr
 	);
 
-	d_logger.Info(
+	logger.Info(
 	    "starting",
 	    slog::String("media", infos.Location.toStdString()),
 	    slog::Duration("offset", atRunningTime)
 	);
 
 	pipeline->play(infos);
+	if (infos.Loop == false || next().scheduled() == true) {
+		return;
+	}
+	next().playMedia(infos, atRunningTime + infos.Duration);
+}
+
+Compositor::InputData &Compositor::InputData::next() const {
+	return layer.inputs[(ID + 1) % 2];
+}
+
+bool Compositor::InputData::scheduled() const {
+	return sink != nullptr;
 }
 
 void Compositor::stop() {
@@ -398,11 +417,16 @@ void Compositor::playUnsafe(
     const MediaPlayInfo &media, int layerIndex, std::chrono::nanoseconds from
 ) {
 	if (layerIndex != 0) {
-		d_logger.Warn("only single layer supported");
+		d_logger.Error("only single layer supported");
 		return;
 	}
 
 	auto layer = d_layers[layerIndex].get();
+	if (layer->media.has_value()) {
+		d_logger.Error("Error cannot replace playing media");
+		return;
+	}
+	layer->media = media;
 	layer->inputs[0].playMedia(media, from);
 }
 
@@ -419,7 +443,7 @@ std::chrono::nanoseconds Compositor::outputTime() {
 }
 
 void Compositor::removeMedia(InputData *input) {
-	input->d_logger.Info("clearing pipeline");
+	input->logger.Info("removing input");
 	if (gst_pad_unlink(input->src.get(), input->sink.get()) == false) {
 		d_logger.Error(
 		    "could not unlink pads",
@@ -450,6 +474,14 @@ void Compositor::removeMedia(InputData *input) {
 	);
 
 	input->sink.reset();
+	auto &media = input->layer.media;
+	if (media.value().Loop == false) {
+		media = std::nullopt;
+		return;
+	}
+	auto loopStart =
+	    std::chrono::nanoseconds{gst_pad_get_offset(input->src.get())};
+	input->playMedia(media.value(), loopStart + 2 * media.value().Duration);
 }
 
 void Compositor::onMessage(GstMessage *msg) noexcept {

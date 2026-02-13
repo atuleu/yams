@@ -151,12 +151,29 @@ void MediaPipeline::onMessage(GstMessage *msg) noexcept {
 		onEOS();
 		break;
 	case GST_MESSAGE_STATE_CHANGED: {
-		if (GST_OBJECT(d_pipeline.get()) != msg->src) {
-			break;
-		}
 		GstState oldState, newState, pending;
 
 		gst_message_parse_state_changed(msg, &oldState, &newState, &pending);
+
+		d_logger.Info(
+		    "state changed",
+		    slog::String("source", (const char *)msg->src->name),
+		    slog::String(
+		        "old",
+		        (const char *)gst_element_state_get_name(oldState)
+		    ),
+		    slog::String(
+		        "new",
+		        (const char *)gst_element_state_get_name(newState)
+		    ),
+		    slog::String(
+		        "pending",
+		        (const char *)gst_element_state_get_name(pending)
+		    )
+		);
+		if (GST_OBJECT(d_pipeline.get()) != msg->src) {
+			break;
+		}
 		if (newState != GST_STATE_NULL) {
 			break;
 		}
@@ -175,6 +192,7 @@ void MediaPipeline::stop() {
 void MediaPipeline::onEOS() {
 	emit EOS();
 	gst_element_set_state(d_pipeline.get(), GST_STATE_NULL);
+	d_logger.Warn("setting to NULL??");
 }
 
 void MediaPipeline::forceDownstreamEOS() {
@@ -190,6 +208,8 @@ void MediaPipeline::onError() {
 }
 
 void MediaPipeline::reset() {
+	d_logger.Info("resetting after EOS");
+
 	if (d_currentMedia.has_value()) {
 		switch (d_currentMedia.value()) {
 		case MediaPlayInfo::Type::IMAGE:
