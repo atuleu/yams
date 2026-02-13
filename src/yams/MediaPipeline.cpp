@@ -95,6 +95,10 @@ MediaPipeline::MediaPipeline(Args args, Compositor *parent)
 	    false) {
 		throw cpptrace::runtime_error("could not link final element");
 	}
+
+	// we disable auto-flushing to see this pipeline go to null state. All
+	// message are processed in our QThread, so it is fine.
+	gst_pipeline_set_auto_flush_bus(GST_PIPELINE(d_pipeline.get()), false);
 }
 
 MediaPipeline::~MediaPipeline() {
@@ -151,29 +155,14 @@ void MediaPipeline::onMessage(GstMessage *msg) noexcept {
 		onEOS();
 		break;
 	case GST_MESSAGE_STATE_CHANGED: {
+		if (GST_OBJECT(d_pipeline.get()) != msg->src) {
+			break;
+		}
+
 		GstState oldState, newState, pending;
 
 		gst_message_parse_state_changed(msg, &oldState, &newState, &pending);
 
-		d_logger.Info(
-		    "state changed",
-		    slog::String("source", (const char *)msg->src->name),
-		    slog::String(
-		        "old",
-		        (const char *)gst_element_state_get_name(oldState)
-		    ),
-		    slog::String(
-		        "new",
-		        (const char *)gst_element_state_get_name(newState)
-		    ),
-		    slog::String(
-		        "pending",
-		        (const char *)gst_element_state_get_name(pending)
-		    )
-		);
-		if (GST_OBJECT(d_pipeline.get()) != msg->src) {
-			break;
-		}
 		if (newState != GST_STATE_NULL) {
 			break;
 		}
@@ -208,7 +197,7 @@ void MediaPipeline::onError() {
 }
 
 void MediaPipeline::reset() {
-	d_logger.Info("resetting after EOS");
+	d_logger.Info("resetting after reaching NULL");
 
 	if (d_currentMedia.has_value()) {
 		switch (d_currentMedia.value()) {

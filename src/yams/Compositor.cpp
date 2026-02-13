@@ -4,14 +4,11 @@
 #include "yams/gstreamer/Memory.hpp"
 
 #include <chrono>
-
-#include <QTimer>
 #include <memory>
 #include <optional>
-#include <qmetaobject.h>
-#include <qnamespace.h>
-#include <qobjectdefs.h>
-#include <qtypes.h>
+
+#include <QMetaObject>
+#include <QTimer>
 
 #include <slog++/Types.hpp>
 #include <slog++/slog++.hpp>
@@ -169,7 +166,7 @@ void Compositor::InputData::playMedia(
 	);
 
 	logger.Info(
-	    "starting",
+	    "starting media",
 	    slog::String("media", infos.Location.toStdString()),
 	    slog::Duration("offset", atRunningTime)
 	);
@@ -178,6 +175,7 @@ void Compositor::InputData::playMedia(
 	if (infos.Loop == false || next().scheduled() == true) {
 		return;
 	}
+
 	next().playMedia(infos, atRunningTime + infos.Duration);
 }
 
@@ -260,7 +258,7 @@ Compositor::Compositor(Options options, Args args)
 	d_blacksrc = GstElementFactoryMakeFull(
 	    "videotestsrc",
 	    "name", "blacksrc0",
-		"is-live", true,
+		"is-live", false,
 		"do-timestamp", true,
 	    "pattern", 2
 	);
@@ -270,7 +268,7 @@ Compositor::Compositor(Options options, Args args)
 	    "caps", blacksourceCaps
 	);
 
-	d_playAdditionnalLatency = 0ms;
+	d_playAdditionnalLatency = 50ms;
 	d_videoMixer = GstElementFactoryMakeFull(
 	    "glvideomixer",
 	    "name", "vmix",
@@ -339,15 +337,14 @@ void Compositor::play(const MediaPlayInfo &media, int layer) {
 	auto runningTime = this->runningTime();
 	auto offset      = outputTime();
 	d_logger.Info(
-	    "playing",
+	    "playing new media",
 	    slog::Duration("running_time", runningTime),
 	    slog::Duration("output_time", offset),
 	    slog::Duration("diff", runningTime - offset)
 	);
-	// offset = runningTime;
-	//  d_playAdditionnalLatency = runningTime - offset + 100ms;
+	offset += d_playAdditionnalLatency;
 	if (QThread::currentThread() == this->thread()) {
-		this->playUnsafe(media, layer, offset + d_playAdditionnalLatency);
+		this->playUnsafe(media, layer, offset);
 		return;
 	}
 	QMetaObject::invokeMethod(
@@ -356,7 +353,7 @@ void Compositor::play(const MediaPlayInfo &media, int layer) {
 	    Qt::QueuedConnection,
 	    media,
 	    layer,
-	    offset + d_playAdditionnalLatency
+	    offset
 	);
 }
 
@@ -406,7 +403,7 @@ GstPadProbeReturn Compositor::onBufferProbe(
 	    &compositor,
 	    &Compositor::reportTimeToFirstBuffer,
 	    Qt::QueuedConnection,
-	    gst_element_get_current_running_time(compositor.d_pipeline.get()),
+	    input->layer.compositor.outputTime().count(),
 	    GST_BUFFER_PTS(GST_PAD_PROBE_INFO_BUFFER(info)),
 	    input->offset.count()
 	);
@@ -479,6 +476,7 @@ void Compositor::removeMedia(InputData *input) {
 		media = std::nullopt;
 		return;
 	}
+
 	auto loopStart =
 	    std::chrono::nanoseconds{gst_pad_get_offset(input->src.get())};
 	input->playMedia(media.value(), loopStart + 2 * media.value().Duration);
