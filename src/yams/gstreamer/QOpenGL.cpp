@@ -31,6 +31,7 @@ GstGLDisplayPtr fromGuiApplication() {
 		if (native == nullptr) {
 			return nullptr;
 		}
+
 		auto waylandDisplay = GstGLDisplayPtr{
 		    (GstGLDisplay *)(gst_gl_display_wayland_new_with_display(
 		        native->display()

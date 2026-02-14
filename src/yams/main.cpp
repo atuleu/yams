@@ -97,8 +97,8 @@ void setOpenGLFormat() {
 	QSurfaceFormat::setDefaultFormat(fmt);
 	slog::Info(
 	    "selected target surface format",
-	    slog::QSurfaceFormat("dummy", test.format()),
-	    slog::QSurfaceFormat("target", test.format())
+	    slog::QSurfaceFormat("test", test.format()),
+	    slog::QSurfaceFormat("target", fmt)
 	);
 }
 

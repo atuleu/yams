@@ -258,7 +258,7 @@ Compositor::Compositor(Options options, Args args)
 	d_blacksrc = GstElementFactoryMakeFull(
 	    "videotestsrc",
 	    "name", "blacksrc0",
-		"is-live", false,
+		"is-live", true,
 		"do-timestamp", true,
 	    "pattern", 2
 	);
@@ -268,14 +268,14 @@ Compositor::Compositor(Options options, Args args)
 	    "caps", blacksourceCaps
 	);
 
-	d_playAdditionnalLatency = 50ms;
+	d_playAdditionnalLatency = 800ms;
 	d_videoMixer = GstElementFactoryMakeFull(
 	    "glvideomixer",
 	    "name", "vmix",
 	    "force-live", true,
 	    "background", 1,
 	    "min-upstream-latency", std::chrono::nanoseconds{0ms}.count(),
-	    "latency", std::chrono::nanoseconds{100ms}.count()
+	    "latency", std::chrono::nanoseconds{800ms}.count()
 	);
 
 	auto compositorCapsfilter = GstElementFactoryMakeFull(
